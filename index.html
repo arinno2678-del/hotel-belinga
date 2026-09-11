@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Hotel Manager</title>
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
+
+    <link rel="stylesheet" href="style.css?v=6">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="logo">
+            <i class="fa-solid fa-hotel"></i>
+            <span>HOTEL BELINGA</span>
+        </div>
+
+        <nav>
+
+            <button class="nav-btn active" type="button" data-view="dashboard">
+                <i class="fa-solid fa-chart-line"></i>
+                Tableau de bord
+            </button>
+
+            <button class="nav-btn" type="button" data-view="rooms">
+                <i class="fa-solid fa-bed"></i>
+                Chambres
+            </button>
+
+            <button class="nav-btn" type="button" data-view="planning">
+                <i class="fa-solid fa-calendar-days"></i>
+                Planning
+            </button>
+
+            <button class="nav-btn" type="button" data-view="clients">
+                <i class="fa-solid fa-users"></i>
+                Clients
+            </button>
+
+            <button class="nav-btn" type="button" data-view="reservations">
+                <i class="fa-solid fa-bookmark"></i>
+                Réservations
+            </button>
+
+            <button class="nav-btn" type="button" data-view="payments">
+                <i class="fa-solid fa-money-bill-wave"></i>
+                Paiements
+            </button>
+
+            <button class="nav-btn" type="button" data-view="statistics">
+                <i class="fa-solid fa-chart-pie"></i>
+                Statistiques
+            </button>
+
+        </nav>
+
+        <div class="sidebar-footer">
+            <small>© 2026 NHA CREATION</small>
+        </div>
+
+    </aside>
+
+
+    <!-- CONTENU -->
+    <main class="main-content">
+
+        <!-- HEADER -->
+        <header class="header">
+
+            <div>
+                <h1 id="pageTitle">Tableau de bord</h1>
+                <p id="pageDescription">Vue générale et activité en temps réel</p>
+            </div>
+
+            <div class="header-right">
+
+                <div class="date" id="currentDate"></div>
+
+                <div class="sync-badge" id="syncBadge">
+                    Base SQLite connectée
+                </div>
+
+                <button class="profile-btn" id="profileButton" type="button" title="Rafraîchir le tableau">
+                    <i class="fa-solid fa-user"></i>
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- TABLEAU DE BORD -->
+        <section class="app-section active" data-view="dashboard">
+
+            <section class="stats">
+
+                <div class="stat-card total">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-hotel"></i>
+                    </div>
+
+                    <div>
+                        <span>Total Chambres</span>
+                        <h2 id="totalRooms">52</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card available">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-door-open"></i>
+                    </div>
+
+                    <div>
+                        <span>Chambres libres</span>
+                        <h2 id="availableRooms">52</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card occupied">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-bed"></i>
+                    </div>
+
+                    <div>
+                        <span>Chambres occupées</span>
+                        <h2 id="occupiedRooms">0</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card reserved">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+
+                    <div>
+                        <span>Réservées</span>
+                        <h2 id="reservedRooms">0</h2>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <section class="dashboard-grid">
+
+                <article class="panel-card">
+                    <div class="panel-head">
+                        <div>
+                            <h3>Arrivées à venir</h3>
+                            <p>Chambres avec une date d’arrivée enregistrée.</p>
+                        </div>
+                        <span class="panel-count" id="arrivalsCount">0</span>
+                    </div>
+                    <div id="dashboardArrivals" class="stack-list"></div>
+                </article>
+
+
+                <article class="panel-card">
+                    <div class="panel-head">
+                        <div>
+                            <h3>Départs à venir</h3>
+                            <p>Chambres à libérer prochainement.</p>
+                        </div>
+                        <span class="panel-count" id="departuresCount">0</span>
+                    </div>
+                    <div id="dashboardDepartures" class="stack-list"></div>
+                </article>
+
+
+                <article class="panel-card">
+                    <div class="panel-head">
+                        <div>
+                            <h3>Historique récent</h3>
+                            <p>Derniers changements appliqués à l’hôtel.</p>
+                        </div>
+                        <span class="panel-count" id="historyCount">0</span>
+                    </div>
+                    <div id="dashboardHistory" class="stack-list"></div>
+                </article>
+
+            </section>
+
+        </section>
+
+
+        <!-- CHAMBRES -->
+        <section class="app-section" data-view="rooms">
+
+            <section class="room-actions">
+
+                <div class="search-box">
+
+                    <i class="fa-solid fa-magnifying-glass"></i>
+
+                    <input
+                        type="text"
+                        id="searchRoom"
+                        placeholder="Rechercher une chambre, un client..."
+                    >
+
+                </div>
+
+
+                <select id="filterType">
+
+                    <option value="all">Toutes les chambres</option>
+
+                    <option value="Suite">Suites</option>
+
+                    <option value="VIP">VIP</option>
+
+                    <option value="Standard">Standard</option>
+
+                </select>
+
+
+                <select id="filterStatus">
+
+                    <option value="all">Tous les statuts</option>
+
+                    <option value="Libre">Libre</option>
+
+                    <option value="Occupée">Occupée</option>
+
+                    <option value="Réservée">Réservée</option>
+
+                    <option value="Nettoyage">Nettoyage</option>
+
+                </select>
+
+
+                <button class="refresh-btn" id="refreshRooms" type="button">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    Actualiser
+                </button>
+
+
+                <button class="refresh-btn export-btn" id="exportRoomsCsv" type="button">
+                    <i class="fa-solid fa-file-csv"></i>
+                    Export chambres CSV
+                </button>
+
+
+                <button class="refresh-btn export-btn" id="exportHistoryCsv" type="button">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Export historique CSV
+                </button>
+
+            </section>
+
+
+            <section class="rooms-header">
+
+                <div>
+
+                    <h2>Les 52 chambres</h2>
+
+                    <p>Numérotation de 01 à 52 avec suivi des clients et des réservations.</p>
+
+                </div>
+
+                <div class="legend">
+
+                    <span class="legend-item">
+                        <span class="dot available-dot"></span>
+                        Libre
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="dot occupied-dot"></span>
+                        Occupée
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="dot reserved-dot"></span>
+                        Réservée
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="dot cleaning-dot"></span>
+                        Nettoyage
+                    </span>
+
+                </div>
+
+            </section>
+
+
+            <section class="rooms-grid" id="roomsGrid">
+                <!-- Généré automatiquement avec JavaScript -->
+            </section>
+
+        </section>
+
+
+        <!-- PLANNING -->
+        <section class="app-section" data-view="planning">
+
+            <section class="section-title">
+                <div>
+                    <h2>Planning</h2>
+                    <p>Vue d’ensemble des arrivées et départs programmés.</p>
+                </div>
+            </section>
+
+            <div id="planningList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- CLIENTS -->
+        <section class="app-section" data-view="clients">
+
+            <section class="section-title">
+                <div>
+                    <h2>Clients</h2>
+                    <p>Clients actuellement associés aux chambres occupées ou réservées.</p>
+                </div>
+            </section>
+
+            <div id="clientsList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- RÉSERVATIONS -->
+        <section class="app-section" data-view="reservations">
+
+            <section class="section-title">
+                <div>
+                    <h2>Réservations</h2>
+                    <p>Chambres occupées et réservées avec les informations client.</p>
+                </div>
+            </section>
+
+            <div id="reservationsList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- PAIEMENTS -->
+        <section class="app-section" data-view="payments">
+
+            <section class="section-title">
+                <div>
+                    <h2>Paiements</h2>
+                    <p>Montants estimés pour les séjours actifs.</p>
+                </div>
+
+                <div class="highlight-metric">
+                    <span>Total estimé</span>
+                    <strong id="paymentsTotal">0 FCFA</strong>
+                </div>
+            </section>
+
+            <div id="paymentsList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- STATISTIQUES -->
+        <section class="app-section" data-view="statistics">
+
+            <section class="section-title">
+                <div>
+                    <h2>Statistiques</h2>
+                    <p>Suivi global, exports et historique des changements.</p>
+                </div>
+            </section>
+
+            <section class="stats-mini-grid">
+
+                <article class="mini-card">
+                    <span>Taux d’occupation</span>
+                    <h3 id="occupancyRate">0%</h3>
+                    <p>Chambres occupées et réservées par rapport au total.</p>
+                </article>
+
+                <article class="mini-card">
+                    <span>Clients actifs</span>
+                    <h3 id="activeClients">0</h3>
+                    <p>Noms de clients enregistrés sur les chambres en cours.</p>
+                </article>
+
+                <article class="mini-card">
+                    <span>Réservations actives</span>
+                    <h3 id="activeReservations">0</h3>
+                    <p>Chambres actuellement occupées ou réservées.</p>
+                </article>
+
+                <article class="mini-card">
+                    <span>Départs à venir</span>
+                    <h3 id="upcomingDepartures">0</h3>
+                    <p>Chambres dont la date de départ est planifiée.</p>
+                </article>
+
+            </section>
+
+
+            <div id="statisticsHistory" class="table-section"></div>
+
+        </section>
+
+    </main>
+
+
+    <!-- MODAL CHAMBRE -->
+    <div class="modal" id="roomModal">
+
+        <div class="modal-content modal-content-wide">
+
+            <button class="close-modal" id="closeModal" type="button">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="modal-header">
+
+                <div class="modal-room-icon">
+                    <i class="fa-solid fa-bed"></i>
+                </div>
+
+                <div>
+
+                    <h2 id="modalRoomNumber">
+                        Chambre
+                    </h2>
+
+                    <p id="modalRoomType">
+                        Standard
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="modal-grid">
+
+                <div class="modal-panel">
+
+                    <div class="modal-info">
+
+                        <div class="info-row">
+                            <span>Statut</span>
+                            <strong id="modalStatus">Libre</strong>
+                        </div>
+
+
+                        <div class="info-row">
+                            <span>Prix / nuit</span>
+                            <strong id="modalPrice">0 FCFA</strong>
+                        </div>
+
+
+                        <div class="info-row">
+                            <span>Dernière modification</span>
+                            <strong id="modalUpdatedAt">-</strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="room-fields">
+
+                        <label for="modalClientName">Nom du client</label>
+                        <input
+                            type="text"
+                            id="modalClientName"
+                            placeholder="Nom complet du client"
+                        >
+
+                        <div class="room-fields-inline">
+
+                            <div>
+                                <label for="modalArrivalDate">Date d’arrivée</label>
+                                <input type="date" id="modalArrivalDate">
+                            </div>
+
+                            <div>
+                                <label for="modalDepartureDate">Date de départ</label>
+                                <input type="date" id="modalDepartureDate">
+                            </div>
+
+                        </div>
+
+                        <p class="modal-helper" id="modalHelperText">
+                            Renseignez le client et les dates pour une chambre occupée ou réservée.
+                        </p>
+
+                    </div>
+
+
+            <div class="modal-actions">
+                        <button class="modal-action-btn csv-btn" id="exportSingleRoomCsv" type="button">
+                            <i class="fa-solid fa-file-csv"></i>
+                            Exporter CSV chambre
+                        </button>
+                        <button class="modal-action-btn receipt-btn" id="printReceiptBtn" type="button">
+                            <i class="fa-solid fa-print"></i>
+                            Imprimer reçu PDF
+                        </button>
+                    </div>
+
+                    <div class="status-buttons">
+
+                        <button class="status-btn free-btn" data-status="Libre" type="button">
+                            🟢 Libre
+                        </button>
+
+                        <button class="status-btn occupied-btn" data-status="Occupée" type="button">
+                            🔴 Occupée
+                        </button>
+
+                        <button class="status-btn reserved-btn" data-status="Réservée" type="button">
+                            🟠 Réservée
+                        </button>
+
+                        <button class="status-btn cleaning-btn" data-status="Nettoyage" type="button">
+                            🔵 Nettoyage
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-panel">
+
+                    <div class="panel-head">
+                        <div>
+                            <h3>Historique de la chambre</h3>
+                            <p>Derniers changements enregistrés.</p>
+                        </div>
+                        <span class="panel-count" id="modalHistoryCount">0</span>
+                    </div>
+
+                    <div id="modalHistoryList" class="history-list"></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script src="script.js?v=7"></script>
+
+</body>
+</html>

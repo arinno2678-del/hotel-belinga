@@ -1,0 +1,13 @@
+{
+  "name": "hotel-belinga",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "reset": "node reset.js",
+    "reset:force": "node reset.js --force",
+    "reset:server": "node server.js --reset"
+  }
+}
