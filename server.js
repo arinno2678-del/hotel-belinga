@@ -17,7 +17,7 @@ const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]
 
 function getAllowedPrices(type) {
     const normalized = String(type || "");
-    if (normalized === "VIP") return [70000, 60000];
+    if (normalized === "VIP") return [70000, 60000, 50000];
     if (normalized === "Standard") return [45000, 35000];
     if (normalized === "Suite Junior") return [200000, 150000];
     if (normalized === "Suite Ministérielle") return [300000, 250000];
@@ -55,7 +55,7 @@ function buildDefaultRooms() {
         }
     };
 
-    // VIP : chambres 01 a 14 (70 000 ou 60 000 FCFA)
+    // VIP : chambres 01 a 14 (70 000, 60 000 ou 50 000 FCFA)
     pushRange(1, 7, "VIP", 70000);
     pushRange(8, 14, "VIP", 60000);
 
@@ -603,8 +603,14 @@ function normalizeStatusPayload(body, currentRoom) {
         return { error: "Les dates d'arrivée et de départ sont obligatoires pour une chambre occupée ou réservée." };
     }
 
+    // Départ anticipé autorisé : le départ peut être avancé mais doit rester
+    // strictement après l'arrivée (sinon 0 nuit facturable).
+    if ((status === "Occupée" || status === "Réservée") && departureDate <= arrivalDate) {
+        return { error: "La date de départ (même anticipée) doit être postérieure à la date d'arrivée." };
+    }
+
     // Prix modifiable : doit faire partie des tarifs autorisés pour le type de chambre.
-    // VIP : 70 000 ou 60 000 | Standard : 45 000 ou 35 000 | Suites : leurs tarifs.
+    // VIP : 70 000, 60 000 ou 50 000 | Standard : 45 000 ou 35 000 | Suites : leurs tarifs.
     let price = Number(currentRoom?.price || 0);
     if (body?.price !== undefined && body?.price !== null && String(body.price).trim() !== "") {
         const parsed = Number(String(body.price).replace(/[\s\u00A0]/g, ""));

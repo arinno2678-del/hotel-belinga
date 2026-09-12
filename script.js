@@ -123,6 +123,10 @@ const modalDepartureDate = document.getElementById("modalDepartureDate");
 
 const modalHelperText = document.getElementById("modalHelperText");
 
+const saveRoomChangesBtn = document.getElementById("saveRoomChangesBtn");
+
+const earlyCheckoutBtn = document.getElementById("earlyCheckoutBtn");
+
 const modalHistoryList = document.getElementById("modalHistoryList");
 
 const modalHistoryCount = document.getElementById("modalHistoryCount");
@@ -228,7 +232,7 @@ function formatMoney(amount) {
 
 function getAllowedPrices(type) {
     const normalized = String(type || "");
-    if (normalized === "VIP") return [70000, 60000];
+    if (normalized === "VIP") return [70000, 60000, 50000];
     if (normalized === "Standard") return [45000, 35000];
     if (normalized === "Suite Junior") return [200000, 150000];
     if (normalized === "Suite Ministérielle") return [300000, 250000];
@@ -1108,8 +1112,10 @@ function validateModalPayload(status, payload) {
             return "Les dates d'arrivée et de départ sont obligatoires.";
         }
 
-        if (payload.departureDate < payload.arrivalDate) {
-            return "La date de départ doit être postérieure à la date d'arrivée.";
+        // Départ anticipé autorisé : le départ peut être avancé mais doit
+        // rester strictement après l'arrivée (sinon 0 nuit facturable).
+        if (payload.departureDate <= payload.arrivalDate) {
+            return "La date de départ (même anticipée) doit être postérieure à la date d'arrivée.";
         }
     }
 
@@ -1145,6 +1151,161 @@ function setStatusButtonsDisabled(disabled) {
         button.disabled = disabled;
     });
 
+    if (saveRoomChangesBtn) {
+        saveRoomChangesBtn.disabled = disabled;
+    }
+
+    if (typeof earlyCheckoutBtn !== "undefined" && earlyCheckoutBtn) {
+        earlyCheckoutBtn.disabled = disabled;
+    }
+
+}
+
+
+async function persistRoomUpdate(nextStatus, payload, { keepOpen = false, successMessage = null } = {}) {
+
+    if (!selectedRoom || isSaving) return null;
+
+    const roomNumber = selectedRoom.number;
+
+    isSaving = true;
+    setStatusButtonsDisabled(true);
+
+    try {
+
+        const updatedRoom = await saveRoomUpdate(roomNumber, {
+            status: nextStatus,
+            ...payload
+        });
+
+        // Si on libère ou on met en nettoyage, on vide visuellement les champs
+        if (nextStatus === "Libre" || nextStatus === "Nettoyage") {
+            modalClientName.value = "";
+            modalArrivalDate.value = "";
+            modalDepartureDate.value = "";
+        }
+
+        if (modalPriceSelect && updatedRoom && updatedRoom.price) {
+            refreshModalPriceOptions(updatedRoom);
+            if (modalPrice) {
+                modalPrice.textContent = `${formatMoney(updatedRoom.price)} / nuit`;
+            }
+        }
+
+        selectedRoom = updatedRoom;
+
+        if (keepOpen) {
+            modalStatus.textContent = updatedRoom.status;
+            modalUpdatedAt.textContent = formatDateTime(updatedRoom.updated_at);
+            modalClientName.value = updatedRoom.client_name || "";
+            modalArrivalDate.value = updatedRoom.arrival_date || "";
+            modalDepartureDate.value = updatedRoom.departure_date || "";
+            updateModalHelper(updatedRoom.status);
+            renderModalHistory(updatedRoom.number);
+        } else {
+            closeRoomModal();
+        }
+
+        await refreshRooms();
+
+        if (successMessage) {
+            alert(successMessage);
+        }
+
+        return updatedRoom;
+
+    } catch (error) {
+
+        console.error(error);
+        alert(error && error.message ? error.message : "Impossible d'enregistrer. Vérifie que le serveur Node est lancé.");
+        return null;
+
+    } finally {
+
+        isSaving = false;
+        setStatusButtonsDisabled(false);
+
+    }
+
+}
+
+
+if (saveRoomChangesBtn) {
+
+    saveRoomChangesBtn.addEventListener("click", async () => {
+
+        if (!selectedRoom || isSaving) return;
+
+        // Modification sans changer le statut : on garde le statut actuel.
+        // Cas typique : le client part plus tôt -> on change la date de départ
+        // et/ou le tarif, puis on enregistre.
+        const nextStatus = selectedRoom.status;
+        const payload = getModalPayload();
+        const validationMessage = validateModalPayload(nextStatus, payload);
+
+        if (validationMessage) {
+            alert(validationMessage);
+            return;
+        }
+
+        if (isSameAsSelectedRoom(nextStatus, payload)) {
+            alert("Aucune modification à enregistrer (dates / prix identiques).");
+            return;
+        }
+
+        await persistRoomUpdate(nextStatus, payload, {
+            keepOpen: true,
+            successMessage: `Chambre ${selectedRoom.number} mise à jour : dates / prix enregistrés sans changer le statut (${nextStatus}).`
+        });
+
+    });
+
+}
+
+
+if (typeof earlyCheckoutBtn !== "undefined" && earlyCheckoutBtn) {
+
+    earlyCheckoutBtn.addEventListener("click", async () => {
+
+        if (!selectedRoom || isSaving) return;
+
+        if (selectedRoom.status !== "Occupée" && selectedRoom.status !== "Réservée") {
+            alert("Le départ anticipé concerne une chambre Occupée ou Réservée.");
+            return;
+        }
+
+        // Départ anticipé : date de départ = aujourd'hui (jamais avant l'arrivée + 1 jour).
+        const today = toInputDate(new Date());
+        const arrival = modalArrivalDate.value || selectedRoom.arrival_date || today;
+        let earlyDeparture = today;
+        if (arrival && earlyDeparture <= arrival) {
+            const minDeparture = new Date(`${arrival}T00:00:00`);
+            minDeparture.setDate(minDeparture.getDate() + 1);
+            earlyDeparture = toInputDate(minDeparture);
+        }
+
+        modalDepartureDate.value = earlyDeparture;
+
+        const payload = getModalPayload();
+        payload.departureDate = earlyDeparture;
+        const validationMessage = validateModalPayload(selectedRoom.status, payload);
+
+        if (validationMessage) {
+            alert(validationMessage);
+            return;
+        }
+
+        if (!confirm(`Confirmer le départ anticipé de la chambre ${selectedRoom.number} au ${earlyDeparture} ? Le montant estimé sera recalculé.`)) {
+            return;
+        }
+
+        await persistRoomUpdate(selectedRoom.status, payload, {
+            keepOpen: true,
+            successMessage: `Départ anticipé enregistré : chambre ${selectedRoom.number} → départ le ${earlyDeparture}.`
+        });
+
+    });
+
 }
 
 
@@ -1155,7 +1316,6 @@ statusButtons.forEach(button => {
         if (!selectedRoom || isSaving) return;
 
         const nextStatus = button.dataset.status;
-        const roomNumber = selectedRoom.number;
         const payload = getModalPayload();
         const validationMessage = validateModalPayload(nextStatus, payload);
 
@@ -1165,49 +1325,11 @@ statusButtons.forEach(button => {
         }
 
         if (isSameAsSelectedRoom(nextStatus, payload)) {
-            alert("La chambre " + roomNumber + " est déjà \"" + nextStatus + "\" — aucune modification à enregistrer.");
+            alert("La chambre " + selectedRoom.number + " est déjà \"" + nextStatus + "\" — aucune modification à enregistrer.");
             return;
         }
 
-        isSaving = true;
-        setStatusButtonsDisabled(true);
-
-        try {
-
-            const updatedRoom = await saveRoomUpdate(roomNumber, {
-                status: nextStatus,
-                ...payload
-            });
-
-            // Si on libère ou on met en nettoyage, on vide visuellement les champs
-            if (nextStatus === "Libre" || nextStatus === "Nettoyage") {
-                modalClientName.value = "";
-                modalArrivalDate.value = "";
-                modalDepartureDate.value = "";
-            }
-
-            if (modalPriceSelect && updatedRoom && updatedRoom.price) {
-                modalPriceSelect.value = String(updatedRoom.price);
-                if (modalPrice) {
-                    modalPrice.textContent = `${formatMoney(updatedRoom.price)} / nuit`;
-                }
-            }
-
-            selectedRoom = updatedRoom;
-            closeRoomModal();
-            await refreshRooms();
-
-        } catch (error) {
-
-            console.error(error);
-            alert(error && error.message ? error.message : "Impossible d'enregistrer le statut. Vérifie que le serveur Node est lancé.");
-
-        } finally {
-
-            isSaving = false;
-            setStatusButtonsDisabled(false);
-
-        }
+        await persistRoomUpdate(nextStatus, payload);
 
     });
 

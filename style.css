@@ -785,6 +785,12 @@ select {
 
 .price-row select { border: 1px solid #dbe1ea; border-radius: 10px; padding: 10px 12px; font-family: inherit; font-weight: 600; background: white; max-width: 230px; cursor: pointer; }
 .price-row { align-items: center; gap: 10px; }
+.save-changes-btn { margin-top: 12px; width: 100%; border: none; border-radius: 10px; padding: 13px; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; color: white; background: #16a34a; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.save-changes-btn:hover { background: #15803d; }
+.save-changes-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.early-checkout-btn { margin-top: 8px; width: 100%; border: 1px solid #f59e0b; border-radius: 10px; padding: 12px; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; color: #92400e; background: #fef3c7; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.early-checkout-btn:hover { background: #fde68a; }
+.early-checkout-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .room-fields-inline {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
