@@ -15,48 +15,61 @@ const databasePath = path.join(__dirname, "hotel-belinga.sqlite");
 const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]);
 
 
+function getAllowedPrices(type) {
+    const normalized = String(type || "");
+    if (normalized === "VIP") return [70000, 60000];
+    if (normalized === "Standard") return [45000, 35000];
+    if (normalized === "Suite Junior") return [200000, 150000];
+    if (normalized === "Suite Ministérielle") return [300000, 250000];
+    if (normalized === "Suite Nuptiale") return [350000];
+    // Anciens types "Suite" générique (avant la mise à jour) : on accepte les 5 tarifs
+    if (normalized === "Suite") return [350000, 300000, 250000, 200000, 150000];
+    return [];
+}
+
+
+function defaultPriceFor(type, fallback = 0) {
+    const allowed = getAllowedPrices(type);
+    if (allowed.length > 0) return allowed[0];
+    const numeric = Number(fallback);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+
 function buildDefaultRooms() {
 
     const rooms = [];
 
-    for (let i = 1; i <= 35; i++) {
-        rooms.push({
-            number: i,
-            type: "Standard",
-            price: 25000,
-            status: "Libre",
-            client_name: "",
-            arrival_date: "",
-            departure_date: "",
-            updated_at: null
-        });
-    }
+    const pushRange = (start, end, type, price) => {
+        for (let i = start; i <= end; i++) {
+            rooms.push({
+                number: i,
+                type,
+                price,
+                status: "Libre",
+                client_name: "",
+                arrival_date: "",
+                departure_date: "",
+                updated_at: null
+            });
+        }
+    };
 
-    for (let i = 36; i <= 49; i++) {
-        rooms.push({
-            number: i,
-            type: "VIP",
-            price: 50000,
-            status: "Libre",
-            client_name: "",
-            arrival_date: "",
-            departure_date: "",
-            updated_at: null
-        });
-    }
+    // VIP : chambres 01 a 14 (70 000 ou 60 000 FCFA)
+    pushRange(1, 7, "VIP", 70000);
+    pushRange(8, 14, "VIP", 60000);
 
-    for (let i = 50; i <= 52; i++) {
-        rooms.push({
-            number: i,
-            type: "Suite",
-            price: 80000,
-            status: "Libre",
-            client_name: "",
-            arrival_date: "",
-            departure_date: "",
-            updated_at: null
-        });
-    }
+    // Standard : 45 000 ou 35 000 FCFA (35 chambres : 15 -> 49)
+    pushRange(15, 32, "Standard", 45000);
+    pushRange(33, 49, "Standard", 35000);
+
+    // 3 Suites uniquement :
+    // 50 = Suite Junior (choix 200 000 ou 150 000)
+    // 51 = Suite Ministérielle (choix 300 000 ou 250 000)
+    // 52 = Suite Nuptiale (350 000 fixe)
+    pushRange(50, 50, "Suite Junior", 200000);
+    pushRange(51, 51, "Suite Ministérielle", 300000);
+    pushRange(52, 52, "Suite Nuptiale", 350000);
 
     return rooms;
 
@@ -455,9 +468,14 @@ function ensureRoomSeed() {
             number, type, price, status, client_name, arrival_date, departure_date, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const updateRoom = db.prepare(`
+    const updateRoomType = db.prepare(`
         UPDATE rooms
-        SET type = ?, price = ?
+        SET type = ?
+        WHERE number = ?
+    `);
+    const updateRoomPrice = db.prepare(`
+        UPDATE rooms
+        SET price = ?
         WHERE number = ?
     `);
 
@@ -473,7 +491,19 @@ function ensureRoomSeed() {
             room.updated_at
         );
 
-        updateRoom.run(room.type, room.price, room.number);
+        const existing = db.prepare("SELECT type, price FROM rooms WHERE number = ?").get(room.number);
+        if (existing && existing.type !== room.type) {
+            updateRoomType.run(room.type, room.number);
+        }
+        // Prix : on corrige seulement si le prix actuel n'est pas un tarif
+        // autorisé pour ce type (ex: ancien 25 000 / 50 000 / 80 000).
+        // On ne touche PAS au choix 70 000 vs 60 000 déjà fait.
+        if (existing) {
+            const allowed = getAllowedPrices(room.type);
+            if (allowed.length > 0 && !allowed.includes(Number(existing.price))) {
+                updateRoomPrice.run(room.price, room.number);
+            }
+        }
     }
 
 }
@@ -526,7 +556,7 @@ const selectHistory = db.prepare(`
 
 const updateRoom = db.prepare(`
     UPDATE rooms
-    SET status = ?, client_name = ?, arrival_date = ?, departure_date = ?, updated_at = CURRENT_TIMESTAMP
+    SET status = ?, client_name = ?, arrival_date = ?, departure_date = ?, price = ?, updated_at = CURRENT_TIMESTAMP
     WHERE number = ?
 `);
 
@@ -573,14 +603,30 @@ function normalizeStatusPayload(body, currentRoom) {
         return { error: "Les dates d'arrivée et de départ sont obligatoires pour une chambre occupée ou réservée." };
     }
 
+    // Prix modifiable : doit faire partie des tarifs autorisés pour le type de chambre.
+    // VIP : 70 000 ou 60 000 | Standard : 45 000 ou 35 000 | Suites : leurs tarifs.
+    let price = Number(currentRoom?.price || 0);
+    if (body?.price !== undefined && body?.price !== null && String(body.price).trim() !== "") {
+        const parsed = Number(String(body.price).replace(/[\s\u00A0]/g, ""));
+        const allowed = getAllowedPrices(currentRoom?.type);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+            return { error: "Prix invalide." };
+        }
+        if (allowed.length > 0 && !allowed.includes(parsed)) {
+            return { error: `Prix invalide pour une chambre ${currentRoom?.type}. Choix possibles : ${allowed.map(p => p.toLocaleString("fr-FR") + " FCFA").join(" ou ")}.` };
+        }
+        price = parsed;
+    }
+
     const payload = {
         status,
         clientName: status === "Libre" || status === "Nettoyage" ? "" : clientName,
         arrivalDate: status === "Libre" || status === "Nettoyage" ? "" : arrivalDate,
-        departureDate: status === "Libre" || status === "Nettoyage" ? "" : departureDate
+        departureDate: status === "Libre" || status === "Nettoyage" ? "" : departureDate,
+        price
     };
 
-    if (currentRoom && currentRoom.status === payload.status && currentRoom.client_name === payload.clientName && currentRoom.arrival_date === payload.arrivalDate && currentRoom.departure_date === payload.departureDate) {
+    if (currentRoom && currentRoom.status === payload.status && currentRoom.client_name === payload.clientName && currentRoom.arrival_date === payload.arrivalDate && currentRoom.departure_date === payload.departureDate && Number(currentRoom.price || 0) === Number(payload.price || 0)) {
         return { payload, unchanged: true };
     }
 
@@ -768,7 +814,7 @@ const server = http.createServer(async (req, res) => {
             const { payload, unchanged } = normalized;
 
             if (!unchanged) {
-                updateRoom.run(payload.status, payload.clientName, payload.arrivalDate, payload.departureDate, number);
+                updateRoom.run(payload.status, payload.clientName, payload.arrivalDate, payload.departureDate, payload.price, number);
                 insertHistory.run(
                     number,
                     currentRoom.status,

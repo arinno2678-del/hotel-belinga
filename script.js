@@ -111,6 +111,8 @@ const modalStatus = document.getElementById("modalStatus");
 
 const modalPrice = document.getElementById("modalPrice");
 
+const modalPriceSelect = document.getElementById("modalPriceSelect");
+
 const modalUpdatedAt = document.getElementById("modalUpdatedAt");
 
 const modalClientName = document.getElementById("modalClientName");
@@ -221,6 +223,35 @@ function formatMoney(amount) {
 
     return `${Number(amount || 0).toLocaleString("fr-FR")} FCFA`;
 
+}
+
+
+function getAllowedPrices(type) {
+    const normalized = String(type || "");
+    if (normalized === "VIP") return [70000, 60000];
+    if (normalized === "Standard") return [45000, 35000];
+    if (normalized === "Suite Junior") return [200000, 150000];
+    if (normalized === "Suite Ministérielle") return [300000, 250000];
+    if (normalized === "Suite Nuptiale") return [350000];
+    if (normalized === "Suite") return [350000, 300000, 250000, 200000, 150000];
+    return [];
+}
+
+
+function refreshModalPriceOptions(room) {
+    if (!modalPriceSelect) return;
+    const allowed = getAllowedPrices(room?.type);
+    const current = Number(room?.price || 0);
+    const options = allowed.length > 0 ? allowed : (current > 0 ? [current] : []);
+    modalPriceSelect.innerHTML = options
+        .map(price => `<option value="${price}"${Number(price) === current ? " selected" : ""}>${formatMoney(price)}</option>`)
+        .join("");
+    modalPriceSelect.disabled = options.length <= 1;
+    modalPriceSelect.onchange = () => {
+        if (modalPrice) {
+            modalPrice.textContent = `${formatMoney(modalPriceSelect.value)} / nuit`;
+        }
+    };
 }
 
 
@@ -863,7 +894,8 @@ function renderRooms() {
 
         const matchType =
             typeValue === "all" ||
-            room.type === typeValue;
+            room.type === typeValue ||
+            (typeValue === "Suite" && String(room.type || "").startsWith("Suite"));
 
 
         const matchStatus =
@@ -991,6 +1023,7 @@ function openRoomModal(room) {
     modalRoomType.textContent = room.type;
     modalStatus.textContent = room.status;
     modalPrice.textContent = `${formatMoney(room.price)} / nuit`;
+    refreshModalPriceOptions(room);
     modalUpdatedAt.textContent = formatDateTime(room.updated_at);
     modalClientName.value = room.client_name || "";
     modalArrivalDate.value = room.arrival_date || "";
@@ -1057,7 +1090,8 @@ function getModalPayload() {
     return {
         clientName: modalClientName.value.trim(),
         arrivalDate: modalArrivalDate.value,
-        departureDate: modalDepartureDate.value
+        departureDate: modalDepartureDate.value,
+        price: modalPriceSelect ? modalPriceSelect.value : undefined
     };
 
 }
@@ -1092,11 +1126,15 @@ function isSameAsSelectedRoom(status, payload) {
     const expectedClient = (status === "Libre" || status === "Nettoyage") ? "" : payload.clientName;
     const expectedArrival = (status === "Libre" || status === "Nettoyage") ? "" : payload.arrivalDate;
     const expectedDeparture = (status === "Libre" || status === "Nettoyage") ? "" : payload.departureDate;
+    const expectedPrice = payload.price !== undefined && String(payload.price).trim() !== ""
+        ? Number(String(payload.price).replace(/[\s ]/g, ""))
+        : Number(selectedRoom.price || 0);
 
     return selectedRoom.status === status &&
         (selectedRoom.client_name || "") === expectedClient &&
         (selectedRoom.arrival_date || "") === expectedArrival &&
-        (selectedRoom.departure_date || "") === expectedDeparture;
+        (selectedRoom.departure_date || "") === expectedDeparture &&
+        Number(selectedRoom.price || 0) === Number(expectedPrice || 0);
 
 }
 
@@ -1146,6 +1184,13 @@ statusButtons.forEach(button => {
                 modalClientName.value = "";
                 modalArrivalDate.value = "";
                 modalDepartureDate.value = "";
+            }
+
+            if (modalPriceSelect && updatedRoom && updatedRoom.price) {
+                modalPriceSelect.value = String(updatedRoom.price);
+                if (modalPrice) {
+                    modalPrice.textContent = `${formatMoney(updatedRoom.price)} / nuit`;
+                }
             }
 
             selectedRoom = updatedRoom;
