@@ -370,16 +370,53 @@
             <section class="section-title">
                 <div>
                     <h2>Paiements</h2>
-                    <p>Montants estimés pour les séjours actifs.</p>
+                    <p>Estimation en cours + journal enregistré (conservé après départ anticipé / check-out).</p>
                 </div>
 
-                <div class="highlight-metric">
-                    <span>Total estimé</span>
-                    <strong id="paymentsTotal">0 FCFA</strong>
+                <div class="room-actions">
+                    <div class="highlight-metric">
+                        <span>Total estimé (en cours)</span>
+                        <strong id="paymentsTotal">0 FCFA</strong>
+                    </div>
+
+                    <div class="highlight-metric">
+                        <span>Total enregistré (journal)</span>
+                        <strong id="paymentsRecordedTotal">0 FCFA</strong>
+                    </div>
+
+                    <button class="export-btn" id="exportPaymentsCsv" type="button">
+                        <i class="fa-solid fa-file-csv"></i>
+                        Exporter paiements CSV
+                    </button>
                 </div>
             </section>
 
-            <div id="paymentsList" class="table-section"></div>
+            <section class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h3>Séjours en cours — estimation</h3>
+                        <p>Calculée depuis les chambres Occupées / Réservées.</p>
+                    </div>
+                </div>
+
+                <div id="paymentsList" class="table-section"></div>
+
+            </section>
+
+            <section class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h3>Journal des paiements enregistrés</h3>
+                        <p>Réservations, modifications, départs anticipés et check-out. Ne s'efface pas quand la chambre passe à Libre.</p>
+                    </div>
+                    <span class="panel-count" id="paymentsHistoryCount">0</span>
+                </div>
+
+                <div id="paymentsHistoryList" class="table-section"></div>
+
+            </section>
 
         </section>
 
@@ -588,7 +625,7 @@
     </div>
 
 
-    <script src="script.js?v=12"></script>
+    <script src="script.js?v=13"></script>
 
 </body>
 </html>

@@ -84,6 +84,14 @@ const paymentsList = document.getElementById("paymentsList");
 
 const paymentsTotal = document.getElementById("paymentsTotal");
 
+const paymentsRecordedTotal = document.getElementById("paymentsRecordedTotal");
+
+const paymentsHistoryList = document.getElementById("paymentsHistoryList");
+
+const paymentsHistoryCount = document.getElementById("paymentsHistoryCount");
+
+const exportPaymentsButton = document.getElementById("exportPaymentsCsv");
+
 const statisticsHistory = document.getElementById("statisticsHistory");
 
 const occupancyRateEl = document.getElementById("occupancyRate");
@@ -1208,6 +1216,10 @@ async function persistRoomUpdate(nextStatus, payload, { keepOpen = false, succes
 
         await refreshRooms();
 
+        // Le journal des paiements a pu changer (réservation, modification,
+        // départ anticipé, check-out) : on le recharge aussitôt.
+        await renderPaymentsHistory();
+
         if (successMessage) {
             alert(successMessage);
         }
@@ -1571,6 +1583,85 @@ function renderPayments() {
         "Aucun paiement estimé pour le moment."
     );
 
+    renderPaymentsHistory();
+
+}
+
+
+async function loadPaymentsHistory() {
+
+    try {
+        const response = await fetch("/api/payments?limit=500", { cache: "no-store" });
+        if (!response.ok) throw new Error("Paiements indisponibles");
+        return await response.json();
+    } catch (error) {
+        console.error(error);
+        return [];
+    }
+
+}
+
+
+async function renderPaymentsHistory() {
+
+    if (!paymentsHistoryList) return;
+
+    const rows = await loadPaymentsHistory();
+    const totalAmount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
+    if (paymentsRecordedTotal) {
+        paymentsRecordedTotal.textContent = formatMoney(totalAmount);
+    }
+
+    if (paymentsHistoryCount) {
+        paymentsHistoryCount.textContent = String(rows.length);
+    }
+
+    renderTableSection(
+        paymentsHistoryList,
+        [
+            { label: "Chambre", render: row => `Chambre ${formatRoomNumber(row.room_number)}` },
+            { label: "Client", render: row => escapeHtml(row.client_name || "-") },
+            { label: "Type", render: row => escapeHtml(row.kind || "Séjour") },
+            { label: "Séjour", render: row => `${escapeHtml(formatDateOnly(row.arrival_date))} → ${escapeHtml(formatDateOnly(row.departure_date))} (${Number(row.nights || 0)} nuit(s))` },
+            { label: "Prix / nuit", render: row => escapeHtml(formatMoney(row.price_per_night)) },
+            { label: "Montant", render: row => `<strong>${escapeHtml(formatMoney(row.amount))}</strong>` },
+            { label: "Détail", render: row => escapeHtml(row.note || "-") },
+            { label: "Enregistré le", render: row => escapeHtml(formatDateTime(row.created_at)) },
+            {
+                label: "Action",
+                render: row => `<button class="delete-payment-btn" type="button" data-payment-id="${row.id}" title="Supprimer cette ligne">🗑️</button>`
+            }
+        ],
+        rows,
+        "Aucun paiement enregistré pour le moment. Les réservations, modifications et départs anticipés y seront conservés."
+    );
+
+}
+
+
+if (typeof paymentsHistoryList !== "undefined" && paymentsHistoryList) {
+    paymentsHistoryList.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-payment-id]");
+        if (!button) return;
+        const id = button.dataset.paymentId;
+        if (!confirm(`Supprimer le paiement enregistré #${id} ?`)) return;
+        try {
+            const response = await fetch(`/api/payments/${id}`, { method: "DELETE" });
+            if (!response.ok) throw new Error("Suppression impossible");
+            await renderPaymentsHistory();
+        } catch (error) {
+            console.error(error);
+            alert("Impossible de supprimer ce paiement.");
+        }
+    });
+}
+
+
+if (typeof exportPaymentsButton !== "undefined" && exportPaymentsButton) {
+    exportPaymentsButton.addEventListener("click", () => {
+        downloadFile("/api/exports/payments.csv", "hotel-belinga-paiements.csv");
+    });
 }
 
 

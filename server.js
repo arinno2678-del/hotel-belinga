@@ -289,6 +289,21 @@ db.exec(`
         departure_date TEXT NOT NULL DEFAULT '',
         changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_number INTEGER NOT NULL,
+        room_type TEXT NOT NULL DEFAULT '',
+        client_name TEXT NOT NULL DEFAULT '',
+        arrival_date TEXT NOT NULL DEFAULT '',
+        departure_date TEXT NOT NULL DEFAULT '',
+        nights INTEGER NOT NULL DEFAULT 0,
+        price_per_night INTEGER NOT NULL DEFAULT 0,
+        amount INTEGER NOT NULL DEFAULT 0,
+        kind TEXT NOT NULL DEFAULT 'Séjour',
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 `);
 
 
@@ -311,6 +326,19 @@ function ensureRoomColumns() {
     for (const [columnName, columnDefinition] of requiredColumns) {
         if (!columns.has(columnName)) {
             db.exec(`ALTER TABLE rooms ADD COLUMN ${columnName} ${columnDefinition};`);
+        }
+    }
+
+    const paymentColumns = new Set(getTableColumns("payments"));
+    const requiredPaymentColumns = [
+        ["room_type", "TEXT NOT NULL DEFAULT ''"],
+        ["kind", "TEXT NOT NULL DEFAULT 'Séjour'"],
+        ["note", "TEXT NOT NULL DEFAULT ''"]
+    ];
+
+    for (const [columnName, columnDefinition] of requiredPaymentColumns) {
+        if (!paymentColumns.has(columnName)) {
+            db.exec(`ALTER TABLE payments ADD COLUMN ${columnName} ${columnDefinition};`);
         }
     }
 
@@ -671,6 +699,50 @@ function calculateNights(arrivalDate, departureDate) {
 }
 
 
+function loadPaymentsOrdered(limit = 500) {
+
+    return db.prepare(`
+        SELECT id, room_number, room_type, client_name, arrival_date, departure_date,
+               nights, price_per_night, amount, kind, note, created_at
+        FROM payments
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+    `).all(limit);
+
+}
+
+
+function recordStayPayment({ roomNumber, roomType, clientName, arrivalDate, departureDate, pricePerNight, kind, note }) {
+
+    const nights = calculateNights(arrivalDate, departureDate);
+    const price = Number(pricePerNight || 0);
+    const amount = nights > 0 && price > 0 ? nights * price : 0;
+
+    if (nights <= 0 || amount <= 0) return null;
+
+    db.prepare(`
+        INSERT INTO payments (
+            room_number, room_type, client_name, arrival_date, departure_date,
+            nights, price_per_night, amount, kind, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        roomNumber,
+        roomType || "",
+        clientName || "",
+        arrivalDate || "",
+        departureDate || "",
+        nights,
+        price,
+        amount,
+        kind || "Séjour",
+        note || ""
+    );
+
+    return { nights, price, amount };
+
+}
+
+
 
 
 function handleExport(res, type) {
@@ -683,6 +755,25 @@ function handleExport(res, type) {
     if (type === "history") {
         const csv = toCsv(historyExportRows(), historyColumns());
         return sendCsv(res, "hotel-belinga-historique.csv", csv);
+    }
+
+    if (type === "payments") {
+        const rows = loadPaymentsOrdered(2000);
+        const csv = toCsv(rows, [
+            { label: "ID", get: row => row.id },
+            { label: "Chambre", get: row => row.room_number },
+            { label: "Type", get: row => row.room_type },
+            { label: "Client", get: row => row.client_name },
+            { label: "Arrivée", get: row => row.arrival_date },
+            { label: "Départ", get: row => row.departure_date },
+            { label: "Nuits", get: row => row.nights },
+            { label: "Prix / nuit", get: row => row.price_per_night },
+            { label: "Montant", get: row => row.amount },
+            { label: "Type de paiement", get: row => row.kind },
+            { label: "Note", get: row => row.note },
+            { label: "Enregistré le", get: row => row.created_at }
+        ]);
+        return sendCsv(res, "hotel-belinga-paiements.csv", csv);
     }
 
     return sendText(res, 404, "Export introuvable.");
@@ -796,6 +887,38 @@ const server = http.createServer(async (req, res) => {
         }
 
 
+        // Journal des paiements enregistrés (ne disparaît jamais quand la
+        // chambre passe à Libre : chaque séjour / modification y reste tracé).
+        if (req.method === "GET" && pathname === "/api/payments") {
+            const limit = parsePositiveInt(url.searchParams.get("limit"), 500);
+            return sendJson(res, 200, loadPaymentsOrdered(limit));
+        }
+
+
+        if (req.method === "GET" && pathname === "/api/exports/payments.csv") {
+            return handleExport(res, "payments");
+        }
+
+
+        if (req.method === "DELETE" && pathname.startsWith("/api/payments/")) {
+
+            const id = Number.parseInt(pathname.split("/").pop(), 10);
+
+            if (!Number.isInteger(id)) {
+                return sendText(res, 400, "Identifiant de paiement invalide.");
+            }
+
+            const result = db.prepare("DELETE FROM payments WHERE id = ?").run(id);
+
+            if (result.changes === 0) {
+                return sendText(res, 404, "Paiement introuvable.");
+            }
+
+            return sendJson(res, 200, { deleted: id });
+
+        }
+
+
         if (req.method === "PUT" && pathname.startsWith("/api/rooms/")) {
 
             const number = Number.parseInt(pathname.split("/").pop(), 10);
@@ -829,6 +952,76 @@ const server = http.createServer(async (req, res) => {
                     payload.arrivalDate,
                     payload.departureDate
                 );
+
+                // --- Journal des paiements (reste enregistré même après un
+                // départ anticipé ou un passage à Libre) ---
+                const wasStay =
+                    (currentRoom.status === "Occupée" || currentRoom.status === "Réservée") &&
+                    currentRoom.client_name && currentRoom.arrival_date && currentRoom.departure_date;
+                const isStay =
+                    (payload.status === "Occupée" || payload.status === "Réservée") &&
+                    payload.clientName && payload.arrivalDate && payload.departureDate;
+
+                if (wasStay || isStay) {
+
+                    const oldNights = calculateNights(currentRoom.arrival_date, currentRoom.departure_date);
+                    const oldAmount = oldNights > 0 ? oldNights * Number(currentRoom.price || 0) : 0;
+                    const newNights = calculateNights(payload.arrivalDate, payload.departureDate);
+                    const newAmount = newNights > 0 ? newNights * Number(payload.price || 0) : 0;
+
+                    const leavingRoom = payload.status === "Libre" || payload.status === "Nettoyage";
+
+                    if (leavingRoom && wasStay) {
+                        // Check-out (normal ou anticipé) : on fige le montant final.
+                        // Note : pour Libre/Nettoyage le payload a dates vides,
+                        // on utilise donc les dates du séjour en cours (+ le départ
+                        // anticipé déjà enregistré s'il y en a un).
+                        recordStayPayment({
+                            roomNumber: number,
+                            roomType: currentRoom.type,
+                            clientName: currentRoom.client_name,
+                            arrivalDate: currentRoom.arrival_date,
+                            departureDate: currentRoom.departure_date,
+                            pricePerNight: currentRoom.price,
+                            kind: "Check-out",
+                            note: `Séjour du ${currentRoom.arrival_date} au ${currentRoom.departure_date}`
+                        });
+                    } else if (isStay) {
+                        const datesChanged =
+                            currentRoom.arrival_date !== payload.arrivalDate ||
+                            currentRoom.departure_date !== payload.departureDate;
+                        const priceChanged = Number(currentRoom.price || 0) !== Number(payload.price || 0);
+
+                        if (!wasStay) {
+                            // Nouvelle réservation / occupation.
+                            recordStayPayment({
+                                roomNumber: number,
+                                roomType: currentRoom.type,
+                                clientName: payload.clientName,
+                                arrivalDate: payload.arrivalDate,
+                                departureDate: payload.departureDate,
+                                pricePerNight: payload.price,
+                                kind: "Réservation",
+                                note: `Enregistré à ${payload.status}`
+                            });
+                        } else if ((datesChanged || priceChanged) && (oldAmount !== newAmount)) {
+                            // Modification en cours de séjour (ex : départ anticipé
+                            // sans libérer la chambre) : on trace avant/après.
+                            const early = payload.departureDate && currentRoom.departure_date &&
+                                payload.departureDate < currentRoom.departure_date;
+                            recordStayPayment({
+                                roomNumber: number,
+                                roomType: currentRoom.type,
+                                clientName: payload.clientName,
+                                arrivalDate: payload.arrivalDate,
+                                departureDate: payload.departureDate,
+                                pricePerNight: payload.price,
+                                kind: early ? "Modification (départ anticipé)" : "Modification séjour",
+                                note: `${oldNights} nuit(s) x ${Number(currentRoom.price || 0).toLocaleString("fr-FR")} = ${oldAmount.toLocaleString("fr-FR")} FCFA → ${newNights} nuit(s) x ${Number(payload.price || 0).toLocaleString("fr-FR")} = ${newAmount.toLocaleString("fr-FR")} FCFA`
+                            });
+                        }
+                    }
+                }
             }
 
             return sendJson(res, 200, selectRoomByNumber.get(number));
