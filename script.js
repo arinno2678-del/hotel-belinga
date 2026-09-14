@@ -131,6 +131,45 @@ const modalDepartureDate = document.getElementById("modalDepartureDate");
 
 const modalHelperText = document.getElementById("modalHelperText");
 
+const modalReceptionist = document.getElementById("modalReceptionist");
+
+const RECEPTIONIST_STORAGE_KEY = "hotelBelingaReceptionist";
+
+function getReceptionistName() {
+    const typed = modalReceptionist && typeof modalReceptionist.value === "string"
+        ? modalReceptionist.value.trim()
+        : "";
+    if (typed) return typed;
+    try {
+        return (localStorage.getItem(RECEPTIONIST_STORAGE_KEY) || "").trim();
+    } catch (error) {
+        return "";
+    }
+}
+
+function rememberReceptionistName() {
+    try {
+        const typed = modalReceptionist && typeof modalReceptionist.value === "string"
+            ? modalReceptionist.value.trim().slice(0, 120)
+            : "";
+        if (typed) {
+            localStorage.setItem(RECEPTIONIST_STORAGE_KEY, typed);
+        }
+    } catch (error) {
+        // Stockage local indisponible : on ignore, la facture utilisera le champ saisi.
+    }
+}
+
+if (modalReceptionist) {
+    try {
+        const saved = (localStorage.getItem(RECEPTIONIST_STORAGE_KEY) || "").trim();
+        if (saved) modalReceptionist.value = saved;
+    } catch (error) {
+        // Stockage local indisponible : le champ reste vide.
+    }
+    modalReceptionist.addEventListener("input", rememberReceptionistName);
+}
+
 const saveRoomChangesBtn = document.getElementById("saveRoomChangesBtn");
 
 const earlyCheckoutBtn = document.getElementById("earlyCheckoutBtn");
@@ -536,6 +575,9 @@ async function printRoomReceipt(roomNumber) {
             return;
         }
 
+        const receptionistName = getReceptionistName();
+        rememberReceptionistName();
+
         printWindow.document.write(
             "<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"UTF-8\">" +
             "<title>Recu - Chambre " + paddedNumber + "</title>" +
@@ -548,6 +590,11 @@ async function printRoomReceipt(roomNumber) {
             ".row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #ddd;}" +
             ".row:last-child{border-bottom:none;}" +
             ".total{font-size:20px;font-weight:bold;text-align:right;margin-top:10px;}" +
+            ".signatures{display:flex;justify-content:space-between;gap:30px;margin-top:45px;}" +
+            ".sign-box{flex:1;text-align:center;}" +
+            ".sign-box .label{font-size:13px;color:#444;margin-bottom:45px;}" +
+            ".sign-box .name{font-size:16px;font-weight:bold;}" +
+            ".sign-box .line{border-top:1px solid #111;margin-top:6px;padding-top:6px;font-size:12px;color:#555;}" +
             ".footer{text-align:center;color:#666;font-size:12px;margin-top:25px;}" +
             "@media print{.no-print{display:none;}}" +
             "</style></head><body>" +
@@ -562,6 +609,10 @@ async function printRoomReceipt(roomNumber) {
             "<div class=\"row\"><span><strong>Prix / nuit</strong></span><span>" + escapeHtml(formatMoney(room.price)) + "</span></div>" +
             "</div>" +
             "<div class=\"total\">Total : " + escapeHtml(formatMoney(total)) + "</div>" +
+            "<div class=\"signatures\">" +
+            "<div class=\"sign-box\"><div class=\"label\">Signature du client</div><div class=\"name\">" + escapeHtml(clientName) + "</div><div class=\"line\">Signature</div></div>" +
+            "<div class=\"sign-box\"><div class=\"label\">Le réceptionniste</div><div class=\"name\">" + escapeHtml(receptionistName || "................................") + "</div><div class=\"line\">Nom & signature</div></div>" +
+            "</div>" +
             "<div class=\"footer\"><p>Merci de votre sejour a l'Hotel Belinga.</p><p>Document genere automatiquement — NHA CREATION (c) 2026</p></div>" +
             "<div class=\"no-print\" style=\"text-align:center;margin-top:20px;\"><button onclick=\"window.print()\" style=\"padding:10px 20px;font-size:15px;cursor:pointer;\">Imprimer / Enregistrer en PDF</button></div>" +
             "</body></html>"
