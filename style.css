@@ -181,6 +181,34 @@ nav {
     border-color: #fecaca;
 }
 
+/* Bannière d'alerte (serveur injoignable) */
+.alert-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.alert-banner.show {
+    display: flex;
+}
+
+.alert-banner.error i {
+    color: #b45309;
+}
+
+.alert-banner i {
+    font-size: 18px;
+}
+
 .profile-btn {
     width: 45px;
     height: 45px;

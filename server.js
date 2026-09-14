@@ -18,7 +18,7 @@ const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]
 function getAllowedPrices(type) {
     const normalized = String(type || "");
     if (normalized === "VIP") return [70000, 60000, 50000];
-    if (normalized === "Standard") return [45000, 35000];
+    if (normalized === "Standard") return [45000, 40000, 35000, 30000];
     if (normalized === "Suite Junior") return [200000, 150000];
     if (normalized === "Suite Ministérielle") return [300000, 250000];
     if (normalized === "Suite Nuptiale") return [350000];
@@ -59,7 +59,7 @@ function buildDefaultRooms() {
     pushRange(1, 7, "VIP", 70000);
     pushRange(8, 14, "VIP", 60000);
 
-    // Standard : 45 000 ou 35 000 FCFA (35 chambres : 15 -> 49)
+    // Standard : 45 000, 40 000, 35 000 ou 30 000 FCFA (35 chambres : 15 -> 49)
     pushRange(15, 32, "Standard", 45000);
     pushRange(33, 49, "Standard", 35000);
 
@@ -265,9 +265,27 @@ function escapeSqlLikeValue(value) {
 
 const db = new DatabaseSync(databasePath);
 
-db.exec(`
-    PRAGMA journal_mode = WAL;
+// PRAGMA critiques, exécutés UN PAR UN : db.exec() peut ignorer les
+// instructions suivantes dans certaines versions, donc on garantit ici que
+// la durabilité est bien active (synchronous = FULL => pas de perte de
+// données si le serveur est arrêté brutalement ou si le PC s'éteint).
+db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA synchronous = FULL;");
+db.exec("PRAGMA busy_timeout = 5000;");
+db.exec("PRAGMA foreign_keys = ON;");
 
+try {
+    const journalMode = db.prepare("PRAGMA journal_mode;").get();
+    const syncMode = db.prepare("PRAGMA synchronous;").get();
+    console.log(
+        "SQLite : journal_mode=" + (journalMode && journalMode.journal_mode) +
+        " | synchronous=" + (syncMode && syncMode.synchronous) + " (2 = FULL)"
+    );
+} catch (error) {
+    console.error("Verification des PRAGMA impossible :", error.message);
+}
+
+db.exec(`
     CREATE TABLE IF NOT EXISTS rooms (
         number INTEGER PRIMARY KEY,
         type TEXT NOT NULL,
@@ -589,6 +607,23 @@ const updateRoom = db.prepare(`
     WHERE number = ?
 `);
 
+function checkpointDatabase() {
+    try {
+        db.exec("PRAGMA wal_checkpoint(PASSIVE);");
+    } catch (error) {
+        console.error("Checkpoint WAL impossible :", error.message);
+    }
+}
+
+// Checkpoint périodique : garde le fichier -wal petit et garantit que les
+// écritures sont bien recopiées dans hotel-belinga.sqlite, même si le
+// serveur tourne pendant des heures.
+const checkpointTimer = setInterval(() => {
+    checkpointDatabase();
+}, 5 * 60 * 1000);
+
+checkpointTimer.unref();
+
 const insertHistory = db.prepare(`
     INSERT INTO room_history (
         room_number, previous_status, new_status, client_name, arrival_date, departure_date
@@ -639,7 +674,7 @@ function normalizeStatusPayload(body, currentRoom) {
     }
 
     // Prix modifiable : doit faire partie des tarifs autorisés pour le type de chambre.
-    // VIP : 70 000, 60 000 ou 50 000 | Standard : 45 000 ou 35 000 | Suites : leurs tarifs.
+    // VIP : 70 000, 60 000 ou 50 000 | Standard : 45 000, 40 000, 35 000 ou 30 000 | Suites : leurs tarifs.
     let price = Number(currentRoom?.price || 0);
     if (body?.price !== undefined && body?.price !== null && String(body.price).trim() !== "") {
         const parsed = Number(String(body.price).replace(/[\s\u00A0]/g, ""));
@@ -934,6 +969,7 @@ const server = http.createServer(async (req, res) => {
 
             if (!unchanged) {
                 updateRoom.run(payload.status, payload.clientName, payload.arrivalDate, payload.departureDate, payload.price, number);
+                checkpointDatabase();
                 insertHistory.run(
                     number,
                     currentRoom.status,
@@ -1012,6 +1048,7 @@ const server = http.createServer(async (req, res) => {
                         }
                     }
                 }
+                checkpointDatabase();
             }
 
             return sendJson(res, 200, selectRoomByNumber.get(number));
@@ -1073,4 +1110,43 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`Hotel Belinga en ecoute sur http://localhost:${PORT} et http://127.0.0.1:${PORT}`);
+});
+
+
+// Arrêt propre : on force un checkpoint WAL puis on ferme la base.
+// Sans ça, un Ctrl+C peut laisser les dernières écritures uniquement dans
+// le fichier -wal, et le navigateur semble alors "repartir à zéro".
+let isShuttingDown = false;
+
+function shutdown(signal) {
+
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(`\n${signal} reçu : sauvegarde de la base et arret du serveur...`);
+
+    try {
+        db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+        db.close();
+        console.log("Base SQLite sauvegardee et fermee proprement.");
+    } catch (error) {
+        console.error("Fermeture de la base impossible :", error.message);
+    }
+
+    server.close(() => process.exit(0));
+
+    // Sécurité : si le serveur met trop de temps à se fermer.
+    setTimeout(() => process.exit(0), 3000).unref();
+
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+process.on("exit", () => {
+    try {
+        db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+    } catch (error) {
+        // Ignoré : on est déjà en train de quitter.
+    }
 });

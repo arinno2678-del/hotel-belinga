@@ -42,6 +42,10 @@ const appSections = document.querySelectorAll(".app-section[data-view]");
 
 const syncBadge = document.getElementById("syncBadge");
 
+const alertBanner = document.getElementById("alertBanner");
+
+const alertBannerText = document.getElementById("alertBannerText");
+
 const refreshRoomsButton = document.getElementById("refreshRooms");
 
 const exportRoomsButton = document.getElementById("exportRoomsCsv");
@@ -280,7 +284,7 @@ function formatMoney(amount) {
 function getAllowedPrices(type) {
     const normalized = String(type || "");
     if (normalized === "VIP") return [70000, 60000, 50000];
-    if (normalized === "Standard") return [45000, 35000];
+    if (normalized === "Standard") return [45000, 40000, 35000, 30000];
     if (normalized === "Suite Junior") return [200000, 150000];
     if (normalized === "Suite Ministérielle") return [300000, 250000];
     if (normalized === "Suite Nuptiale") return [350000];
@@ -523,7 +527,7 @@ const API_BASE = window.location.protocol.startsWith("http")
     ? window.location.origin
     : "http://127.0.0.1:3000";
 
-const APP_VERSION = "v6-reset-cli";
+const APP_VERSION = "v7-refresh-fix";
 
 console.log("[Hotel Belinga " + APP_VERSION + "] API_BASE =", API_BASE);
 
@@ -778,6 +782,29 @@ function setSyncBadge(message, isError = false) {
     syncBadge.textContent = message;
     syncBadge.classList.toggle("error", isError);
 
+    // Bannière visible : évite de croire que les données sont perdues alors
+    // que seul le serveur Node n'est pas joignable.
+    if (isError) {
+        setAlertBanner(
+            "Serveur non connecté : les données restent enregistrées dans la base SQLite. " +
+            "Ouvrez la page via http://localhost:3000 (lancez « npm start ») puis actualisez.",
+            true
+        );
+    } else {
+        setAlertBanner("");
+    }
+
+}
+
+
+function setAlertBanner(message, isError = false) {
+
+    if (!alertBanner || !alertBannerText) return;
+
+    alertBanner.classList.toggle("show", Boolean(message));
+    alertBanner.classList.toggle("error", Boolean(isError));
+    alertBannerText.textContent = message || "";
+
 }
 
 
@@ -787,46 +814,92 @@ function setSyncBadge(message, isError = false) {
 
 async function loadRooms() {
 
-    const response = await fetch(apiUrl("/api/rooms"), { cache: "no-store" });
+    const tried = new Set();
+    const candidates = [apiUrl("/api/rooms"), "http://127.0.0.1:3000/api/rooms", "http://localhost:3000/api/rooms"];
+    let lastError = null;
 
-    if (!response.ok) {
-        throw new Error("Impossible de charger les chambres.");
+    for (const url of candidates) {
+        if (tried.has(url)) continue;
+        tried.add(url);
+        try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (response.ok) return response.json();
+            lastError = new Error("Impossible de charger les chambres (" + response.status + ").");
+        } catch (error) {
+            lastError = error;
+        }
     }
 
-    return response.json();
+    throw lastError || new Error("Impossible de charger les chambres.");
 
 }
 
 
 async function loadHistory() {
 
-    const response = await fetch(apiUrl("/api/history?limit=200"), { cache: "no-store" });
+    const tried = new Set();
+    const candidates = [apiUrl("/api/history?limit=200"), "http://127.0.0.1:3000/api/history?limit=200", "http://localhost:3000/api/history?limit=200"];
+    let lastError = null;
 
-    if (!response.ok) {
-        throw new Error("Impossible de charger l'historique.");
+    for (const url of candidates) {
+        if (tried.has(url)) continue;
+        tried.add(url);
+        try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (response.ok) return response.json();
+            lastError = new Error("Impossible de charger l'historique (" + response.status + ").");
+        } catch (error) {
+            lastError = error;
+        }
     }
 
-    return response.json();
+    throw lastError || new Error("Impossible de charger l'historique.");
 
 }
 
 
 async function saveRoomUpdate(roomNumber, payload) {
 
-    const response = await fetch(apiUrl(`/api/rooms/${roomNumber}`), {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-    });
+    // On tente d'abord l'origine courante, puis 127.0.0.1:3000 / localhost:3000.
+    // Ça évite de perdre une saisie si la page a été ouverte via Live Server
+    // ou un fichier local pendant que le serveur tourne.
+    const tried = new Set();
+    const candidates = [
+        apiUrl(`/api/rooms/${roomNumber}`),
+        `http://127.0.0.1:3000/api/rooms/${roomNumber}`,
+        `http://localhost:3000/api/rooms/${roomNumber}`
+    ];
+    let lastError = null;
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Impossible d'enregistrer la chambre.");
+    for (const url of candidates) {
+        if (tried.has(url)) continue;
+        tried.add(url);
+        try {
+            const response = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) return response.json();
+
+            const errorText = await response.text();
+            // Erreur métier (400) : inutile de réessayer ailleurs.
+            if (response.status >= 400 && response.status < 500) {
+                throw new Error(errorText || "Impossible d'enregistrer la chambre.");
+            }
+            lastError = new Error(errorText || "Impossible d'enregistrer la chambre.");
+        } catch (error) {
+            lastError = error;
+            if (error && error.message && !error.message.includes("Failed to fetch") && !error.message.includes("NetworkError") && !error.message.includes("Load failed")) {
+                throw error;
+            }
+        }
     }
 
-    return response.json();
+    throw lastError || new Error("Impossible d'enregistrer la chambre.");
 
 }
 
@@ -1664,14 +1737,27 @@ function renderPayments() {
 
 async function loadPaymentsHistory() {
 
-    try {
-        const response = await fetch("/api/payments?limit=500", { cache: "no-store" });
-        if (!response.ok) throw new Error("Paiements indisponibles");
-        return await response.json();
-    } catch (error) {
-        console.error(error);
-        return [];
+    // Même origine + fallbacks 127.0.0.1/localhost (cas Live Server).
+    const candidates = [
+        apiUrl("/api/payments?limit=500"),
+        "http://127.0.0.1:3000/api/payments?limit=500",
+        "http://localhost:3000/api/payments?limit=500"
+    ];
+    const tried = new Set();
+
+    for (const url of candidates) {
+        if (tried.has(url)) continue;
+        tried.add(url);
+        try {
+            const response = await fetch(url, { cache: "no-store" });
+            if (response.ok) return await response.json();
+        } catch (error) {
+            console.warn("Paiements non chargés via " + url + " :", error);
+        }
     }
+
+    console.error("Paiements indisponibles sur toutes les origines.");
+    return [];
 
 }
 
@@ -1712,7 +1798,7 @@ async function renderPaymentsHistory() {
 
 if (typeof exportPaymentsButton !== "undefined" && exportPaymentsButton) {
     exportPaymentsButton.addEventListener("click", () => {
-        downloadFile("/api/exports/payments.csv", "hotel-belinga-paiements.csv");
+        downloadFile(apiUrl("/api/exports/payments.csv"), "hotel-belinga-paiements.csv");
     });
 }
 
@@ -1791,7 +1877,7 @@ if (refreshRoomsButton) {
 
 if (exportRoomsButton) {
     exportRoomsButton.addEventListener("click", () => {
-        downloadFile("/api/exports/rooms.csv", "hotel-belinga-chambres.csv");
+        downloadFile(apiUrl("/api/exports/rooms.csv"), "hotel-belinga-chambres.csv");
     });
 }
 
@@ -1803,7 +1889,7 @@ if (exportSingleRoomButton) {
             return;
         }
         downloadFile(
-            "/api/exports/rooms/" + selectedRoom.number + ".csv",
+            apiUrl("/api/exports/rooms/" + selectedRoom.number + ".csv"),
             "hotel-belinga-chambre-" + selectedRoom.number + ".csv"
         );
     });
@@ -1823,7 +1909,7 @@ if (printReceiptButton) {
 
 if (exportHistoryButton) {
     exportHistoryButton.addEventListener("click", () => {
-        downloadFile("/api/exports/history.csv", "hotel-belinga-historique.csv");
+        downloadFile(apiUrl("/api/exports/history.csv"), "hotel-belinga-historique.csv");
     });
 }
 
