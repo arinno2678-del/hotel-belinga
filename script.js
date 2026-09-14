@@ -1701,34 +1701,12 @@ async function renderPaymentsHistory() {
             { label: "Prix / nuit", render: row => escapeHtml(formatMoney(row.price_per_night)) },
             { label: "Montant", render: row => `<strong>${escapeHtml(formatMoney(row.amount))}</strong>` },
             { label: "Détail", render: row => escapeHtml(row.note || "-") },
-            { label: "Enregistré le", render: row => escapeHtml(formatDateTime(row.created_at)) },
-            {
-                label: "Action",
-                render: row => `<button class="delete-payment-btn" type="button" data-payment-id="${row.id}" title="Supprimer cette ligne">🗑️</button>`
-            }
+            { label: "Enregistré le", render: row => escapeHtml(formatDateTime(row.created_at)) }
         ],
         rows,
         "Aucun paiement enregistré pour le moment. Les réservations, modifications et départs anticipés y seront conservés."
     );
 
-}
-
-
-if (typeof paymentsHistoryList !== "undefined" && paymentsHistoryList) {
-    paymentsHistoryList.addEventListener("click", async (event) => {
-        const button = event.target.closest("[data-payment-id]");
-        if (!button) return;
-        const id = button.dataset.paymentId;
-        if (!confirm(`Supprimer le paiement enregistré #${id} ?`)) return;
-        try {
-            const response = await fetch(`/api/payments/${id}`, { method: "DELETE" });
-            if (!response.ok) throw new Error("Suppression impossible");
-            await renderPaymentsHistory();
-        } catch (error) {
-            console.error(error);
-            alert("Impossible de supprimer ce paiement.");
-        }
-    });
 }
 
 

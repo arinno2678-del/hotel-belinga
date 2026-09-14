@@ -540,6 +540,7 @@ function ensureRoomSeed() {
 function resetDatabase() {
 
     db.exec("DELETE FROM room_history");
+    db.exec("DELETE FROM payments");
     db.exec("DELETE FROM rooms");
     insertDefaultRooms();
 
@@ -548,7 +549,7 @@ function resetDatabase() {
 
 if (process.argv.includes("--reset")) {
     resetDatabase();
-    console.log("Base reinitialisee : 52 chambres Libres, historique vide.");
+    console.log("Base reinitialisee : 52 chambres Libres, historique et journal des paiements vides.");
 }
 
 
@@ -900,22 +901,11 @@ const server = http.createServer(async (req, res) => {
         }
 
 
+        // Journal des paiements verrouillé : aucune suppression ligne par ligne
+        // depuis le site. Il ne s'efface qu'avec un reset complet
+        // (npm run reset / reset:force / reset:server -> reset.js).
         if (req.method === "DELETE" && pathname.startsWith("/api/payments/")) {
-
-            const id = Number.parseInt(pathname.split("/").pop(), 10);
-
-            if (!Number.isInteger(id)) {
-                return sendText(res, 400, "Identifiant de paiement invalide.");
-            }
-
-            const result = db.prepare("DELETE FROM payments WHERE id = ?").run(id);
-
-            if (result.changes === 0) {
-                return sendText(res, 404, "Paiement introuvable.");
-            }
-
-            return sendJson(res, 200, { deleted: id });
-
+            return sendText(res, 403, "Journal des paiements verrouillé : utilisez le reset complet (npm run reset) pour l'effacer.");
         }
 
 

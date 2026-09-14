@@ -371,7 +371,7 @@
             <section class="section-title">
                 <div>
                     <h2>Paiements</h2>
-                    <p>Estimation en cours + journal enregistré (conservé après départ anticipé / check-out).</p>
+                    <p>Estimation en cours + journal enregistré (verrouillé : reset complet uniquement).</p>
                 </div>
 
                 <div class="room-actions">
@@ -410,7 +410,7 @@
                 <div class="panel-head">
                     <div>
                         <h3>Journal des paiements enregistrés</h3>
-                        <p>Réservations, modifications, départs anticipés et check-out. Ne s'efface pas quand la chambre passe à Libre.</p>
+                        <p>Réservations, modifications, départs anticipés et check-out. Verrouillé : s'efface uniquement avec le reset complet (npm run reset).</p>
                     </div>
                     <span class="panel-count" id="paymentsHistoryCount">0</span>
                 </div>
@@ -634,7 +634,7 @@
     </div>
 
 
-    <script src="script.js?v=15"></script>
+    <script src="script.js?v=16"></script>
 
 </body>
 </html>

@@ -28,7 +28,8 @@ const force = process.argv.includes("--force");
 if (!force) {
     console.log("!!! RESET COMPLET DE L'HOTEL BELINGA !!!");
     console.log("Toutes les chambres repasseront a Libre,");
-    console.log("tous les clients et tout l'historique seront supprimes.");
+    console.log("tous les clients, tout l'historique");
+    console.log("et tout le journal des paiements seront supprimes.");
     console.log("");
 
     const rl = createInterface({ input, output });
