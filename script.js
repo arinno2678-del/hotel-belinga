@@ -131,9 +131,30 @@ const modalArrivalDate = document.getElementById("modalArrivalDate");
 
 const modalDepartureDate = document.getElementById("modalDepartureDate");
 
+const modalAdvancePayment = document.getElementById("modalAdvancePayment");
+
+const modalAdvancePreview = document.getElementById("modalAdvancePreview");
+
 const modalHelperText = document.getElementById("modalHelperText");
 
 const modalReceptionist = document.getElementById("modalReceptionist");
+
+// FACTURE — paiement par avance dans les factures
+const invoiceBtn = document.getElementById("invoiceBtn");
+const invoicePanel = document.getElementById("invoicePanel");
+const invoiceTotal = document.getElementById("invoiceTotal");
+const invoiceAdvance = document.getElementById("invoiceAdvance");
+const invoiceReceptionist = document.getElementById("invoiceReceptionist");
+const invoiceNote = document.getElementById("invoiceNote");
+const invoiceSummary = document.getElementById("invoiceSummary");
+const invoiceTotalDisplay = document.getElementById("invoiceTotalDisplay");
+const invoiceAdvanceDisplay = document.getElementById("invoiceAdvanceDisplay");
+const invoiceBalanceDisplay = document.getElementById("invoiceBalanceDisplay");
+const invoiceHelper = document.getElementById("invoiceHelper");
+const invoiceCreateBtn = document.getElementById("invoiceCreateBtn");
+
+// Variables relatives à la facture en cours d'édition
+let invoiceEditingRoom = null;
 
 const RECEPTIONIST_STORAGE_KEY = "hotelBelingaReceptionist";
 
@@ -172,6 +193,21 @@ if (modalReceptionist) {
     modalReceptionist.addEventListener("input", rememberReceptionistName);
 }
 
+
+// Apercu live « Reste a payer » : mis a jour des que l'avance,
+// les dates ou le tarif changent dans la fiche chambre.
+// La facture, si elle est ouverte, est synchronisée en même temps.
+if (modalAdvancePayment) {
+    modalAdvancePayment.addEventListener("input", handleModalFinancialChange);
+    modalAdvancePayment.addEventListener("change", handleModalFinancialChange);
+}
+
+[modalArrivalDate, modalDepartureDate].forEach(field => {
+    if (!field) return;
+    field.addEventListener("input", handleModalFinancialChange);
+    field.addEventListener("change", handleModalFinancialChange);
+});
+
 const saveRoomChangesBtn = document.getElementById("saveRoomChangesBtn");
 
 const earlyCheckoutBtn = document.getElementById("earlyCheckoutBtn");
@@ -192,6 +228,234 @@ let historyEntries = [];
 let selectedRoom = null;
 
 let isSaving = false;
+// Facture — paiement par avance dans les factures
+
+// Vrai dès que l'utilisateur modifie manuellement un champ de la facture :
+// dans ce cas la synchronisation automatique avec la fiche s'arrête.
+let invoiceTotalTouched = false;
+let invoiceAdvanceTouched = false;
+
+async function openInvoicePanel(room) {
+    if (!invoicePanel) return;
+
+    invoiceEditingRoom = room;
+
+    // La facture repart de la fiche chambre : total = nuits × tarif choisi,
+    // avance = montant déjà versé dans la fiche. L'utilisateur garde la main.
+    invoiceTotalTouched = false;
+    invoiceAdvanceTouched = false;
+
+    // Pré-remplir le réceptionniste
+    if (invoiceReceptionist) invoiceReceptionist.value = getReceptionistName();
+
+    // Pré-remplir la note avec les dates
+    if (invoiceNote) {
+        invoiceNote.value = room?.arrival_date && room?.departure_date
+            ? `Séjour du ${formatDateOnly(room.arrival_date)} au ${formatDateOnly(room.departure_date)}`
+            : '';
+    }
+
+    invoicePanel.hidden = false;
+    syncInvoiceFromModal();
+
+    invoiceTotal?.focus();
+}
+
+// Recopie dans la facture le tarif choisi et l'avance de la fiche chambre,
+// puis met à jour le reste à payer. Appelée à l'ouverture de la facture et
+// à chaque changement de prix, de dates ou d'avance dans la fiche.
+function syncInvoiceFromModal() {
+    if (!invoicePanel || invoicePanel.hidden || !invoiceEditingRoom) return;
+
+    if (invoiceTotal && !invoiceTotalTouched) {
+        const estimated = getModalEstimatedTotal();
+        invoiceTotal.value = estimated.total > 0 ? String(estimated.total) : "";
+    }
+
+    if (invoiceAdvance && !invoiceAdvanceTouched) {
+        const modalAdvance = parseAmountInput(modalAdvancePayment ? modalAdvancePayment.value : "");
+        invoiceAdvance.value = modalAdvance > 0 ? String(modalAdvance) : "";
+    }
+
+    updateInvoiceSummary();
+}
+
+// Point d'entrée unique pour les changements de la fiche (avance, dates,
+// tarif) : met à jour l'aperçu de la fiche ET la facture si elle est ouverte.
+function handleModalFinancialChange() {
+    updateModalAdvancePreview();
+    syncInvoiceFromModal();
+}
+
+function closeInvoicePanel() {
+    if (!invoicePanel) return;
+
+    invoicePanel.hidden = true;
+    invoiceEditingRoom = null;
+}
+
+function updateInvoiceSummary() {
+    if (!invoiceSummary || !invoiceTotalDisplay || !invoiceAdvanceDisplay || !invoiceBalanceDisplay) return;
+
+    const total = parseAmountInput(invoiceTotal?.value);
+    const advance = parseAmountInput(invoiceAdvance?.value);
+    const balance = total - advance;
+
+    invoiceTotalDisplay.textContent = total > 0 ? formatMoney(total) : "-";
+    invoiceAdvanceDisplay.textContent = advance > 0 ? formatMoney(advance) : "-";
+    invoiceBalanceDisplay.textContent = formatMoney(Math.max(0, balance));
+
+    invoiceSummary.hidden = total <= 0;
+
+    // Message d'aide : le reste à payer est toujours affiché avant impression.
+    if (invoiceHelper) {
+        invoiceHelper.classList.remove("invoice-ok", "invoice-error");
+
+        if (total <= 0) {
+            invoiceHelper.textContent = "Indiquez le montant total (nuits × tarif) pour voir le reste à payer.";
+        } else if (advance > total) {
+            invoiceHelper.textContent = "L'avance ne peut pas dépasser le montant total de la facture.";
+            invoiceHelper.classList.add("invoice-error");
+        } else if (advance > 0) {
+            invoiceHelper.textContent = balance <= 0
+                ? "Séjour entièrement réglé par avance."
+                : `Reste à payer : ${formatMoney(balance)}.`;
+            invoiceHelper.classList.add("invoice-ok");
+        } else {
+            invoiceHelper.textContent = `Aucune avance — reste à payer : ${formatMoney(total)}.`;
+        }
+    }
+}
+
+async function createInvoiceFromPanel() {
+    if (!invoiceEditingRoom || isSaving) return;
+
+    const roomNumber = invoiceEditingRoom.number;
+    const total = parseAmountInput(invoiceTotal?.value);
+    const advance = parseAmountInput(invoiceAdvance?.value);
+    const receptionist = invoiceReceptionist?.value?.trim() || '';
+    const note = invoiceNote?.value?.trim() || '';
+
+    if (total <= 0) {
+        alert('Le montant total de la facture doit être supérieur à 0.');
+        invoiceTotal?.focus();
+        return;
+    }
+
+    if (advance > total) {
+        alert("L'avance ne peut pas dépasser le montant total de la facture.");
+        invoiceAdvance?.focus();
+        return;
+    }
+
+    isSaving = true;
+    if (invoiceCreateBtn) invoiceCreateBtn.disabled = true;
+
+    try {
+        const response = await fetch(apiUrl("/api/payments"), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roomNumber,
+                total,
+                advance,
+                receptionist: receptionist || undefined,
+                note: note || undefined,
+            }),
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            alert(`Erreur : ${text || 'Impossible de créer la facture.'}`);
+            return;
+        }
+
+        closeInvoicePanel();
+
+        alert(
+            `Facture créée pour la chambre ${formatRoomNumber(roomNumber)}\n` +
+            `Total : ${formatMoney(total)}\n` +
+            `Avance versée : ${formatMoney(advance)}\n` +
+            `Reste à payer : ${formatMoney(Math.max(0, total - advance))}`
+        );
+
+        // Le journal des paiements vient d'être enrichi dans la base :
+        // on le recharge pour que la vue Paiements soit à jour.
+        await renderPaymentsHistory();
+
+        // Les vues (grille, statistiques) sont rafraîchies : l'avance
+        // reportée sur la chambre y apparaît immédiatement.
+        await refreshRooms();
+
+        // La fiche ouverte est mise à jour avec les données fraîches
+        // (avance reportée par la facture) sans la refermer.
+        if (selectedRoom && Number(selectedRoom.number) === Number(roomNumber)) {
+            const freshRoom = Array.isArray(rooms)
+                ? rooms.find(room => Number(room.number) === Number(roomNumber))
+                : null;
+            if (freshRoom) {
+                selectedRoom = freshRoom;
+                if (modalAdvancePayment) {
+                    modalAdvancePayment.value = Number(freshRoom.advance_payment || 0) > 0
+                        ? String(freshRoom.advance_payment)
+                        : "";
+                }
+                updateModalAdvancePreview();
+                renderModalHistory(freshRoom.number);
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Erreur réseau lors de la création de la facture.');
+    } finally {
+        isSaving = false;
+        if (invoiceCreateBtn) invoiceCreateBtn.disabled = false;
+    }
+}
+
+// Bouton Facture : ouvre la facture pré-remplie (ou la referme si déjà ouverte)
+if (invoiceBtn) {
+    invoiceBtn.addEventListener('click', () => {
+        if (!selectedRoom) return;
+        if (invoicePanel && !invoicePanel.hidden) {
+            closeInvoicePanel();
+            return;
+        }
+        openInvoicePanel(selectedRoom);
+    });
+}
+
+// Bouton Créer la facture
+if (invoiceCreateBtn) {
+    invoiceCreateBtn.addEventListener('click', createInvoiceFromPanel);
+}
+
+// Bouton fermer la facture (croix)
+const invoiceCloseBtn = document.getElementById('invoiceCloseBtn');
+if (invoiceCloseBtn) {
+    invoiceCloseBtn.addEventListener('click', closeInvoicePanel);
+}
+
+// Escape referme la facture si elle est ouverte
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && invoicePanel && !invoicePanel.hidden) {
+        closeInvoicePanel();
+    }
+});
+
+// Toute saisie manuelle dans la facture fige la synchronisation avec la fiche
+if (invoiceTotal) {
+    invoiceTotal.addEventListener('input', () => {
+        invoiceTotalTouched = true;
+        updateInvoiceSummary();
+    });
+}
+if (invoiceAdvance) {
+    invoiceAdvance.addEventListener('input', () => {
+        invoiceAdvanceTouched = true;
+        updateInvoiceSummary();
+    });
+}
 
 let isRefreshing = false;
 
@@ -304,7 +568,77 @@ function refreshModalPriceOptions(room) {
         if (modalPrice) {
             modalPrice.textContent = `${formatMoney(modalPriceSelect.value)} / nuit`;
         }
+        handleModalFinancialChange();
     };
+}
+
+
+// --------------------------
+// PAIEMENT PAR AVANCE (ACOMPTE)
+// --------------------------
+
+// Montant saisi (les espaces et espaces insecables sont toleres).
+// Renvoie 0 si le champ est vide ou invalide.
+function parseAmountInput(value) {
+
+    if (value === undefined || value === null) return 0;
+
+    const parsed = Number(String(value).replace(/[\s\u00A0]/g, ""));
+
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
+
+}
+
+
+// Total estime du sejour tel que saisi dans la fiche (0 si dates incompletes).
+function getModalEstimatedTotal() {
+
+    const start = getDateValue(modalArrivalDate ? modalArrivalDate.value : "");
+    const end = getDateValue(modalDepartureDate ? modalDepartureDate.value : "");
+    const nights = Number.isFinite(start) && Number.isFinite(end) && end > start
+        ? Math.round((end - start) / 86400000)
+        : 0;
+
+    const price = Number(
+        (modalPriceSelect && modalPriceSelect.value ? modalPriceSelect.value : (selectedRoom ? selectedRoom.price : 0)) || 0
+    );
+
+    return { nights, price, total: nights > 0 ? nights * price : 0 };
+
+}
+
+
+// Recapitulatif affiche dans la fiche : total, avance, reste a payer.
+function updateModalAdvancePreview() {
+
+    if (!modalAdvancePreview) return;
+
+    const { nights, price, total } = getModalEstimatedTotal();
+    const advance = parseAmountInput(modalAdvancePayment ? modalAdvancePayment.value : "");
+    const balance = total - advance;
+
+    modalAdvancePreview.classList.remove("balance-due", "balance-settled");
+
+    const parts = [
+        `${nights} nuit(s) x ${formatMoney(price)}`,
+        `Total sejour : ${formatMoney(total)}`,
+        `Avance : ${formatMoney(advance)}`
+    ];
+
+    let label = `Reste a payer : ${formatMoney(balance)}`;
+
+    if (total > 0 && balance === 0) {
+        label = "Sejour entierement regle par avance.";
+        modalAdvancePreview.classList.add("balance-settled");
+    } else if (total > 0 && balance < 0) {
+        label = `Sejour regle — trop-percu : ${formatMoney(Math.abs(balance))}`;
+        modalAdvancePreview.classList.add("balance-settled");
+    } else if (advance > 0) {
+        modalAdvancePreview.classList.add("balance-due");
+    }
+
+    modalAdvancePreview.textContent = `${parts.join(" • ")} → ${label}`;
+
 }
 
 
@@ -549,7 +883,7 @@ function downloadFile(url, filename) {
 }
 
 
-async function printRoomReceipt(roomNumber) {
+async function printRoomReceipt(roomNumber, advanceOverride = 0) {
 
     try {
 
@@ -564,6 +898,26 @@ async function printRoomReceipt(roomNumber) {
         const room = data.room || {};
         const nights = Number(data.nights || 0);
         const total = Number(data.total || 0);
+        // Paiement par avance (acompte) : montant deja verse connu du serveur
+        // (chambre + journal des paiements), et avance saisie dans la fiche
+        // non encore sauvegardee si la fiche est ouverte.
+        const serverAdvance = (data.advance !== undefined && data.advance !== null)
+            ? Number(data.advance)
+            : Number(room.advance_payment || 0);
+        const advance = Math.max(serverAdvance, Number(advanceOverride) || 0);
+        const balance = total - advance;
+        const balanceDue = Math.max(0, balance);
+        const advances = Array.isArray(data.advance_payments) ? data.advance_payments : [];
+        const lastAdvance = advances.length > 0 ? advances[0] : null;
+        const lastAdvanceRow = lastAdvance
+            ? "<div class=\"row\"><span><strong>Avance enregistree le</strong></span><span>" + escapeHtml(formatDateTime(lastAdvance.created_at)) + "</span></div>"
+            : "";
+        const balanceBoxClass = total > 0 && balance <= 0 ? "settled" : "due";
+        const balanceMention = total > 0 && balance <= 0
+            ? (balance < 0
+                ? "Sejour regle — trop-percu de " + formatMoney(Math.abs(balance))
+                : "Sejour entierement regle par avance.")
+            : "Solde a regler au depart du client.";
         const generatedAt = data.generated_at ? formatDateTime(data.generated_at) : formatDateTime(new Date().toISOString());
         const paddedNumber = formatRoomNumber(room.number || roomNumber);
         const clientName = room.client_name || "-";
@@ -598,6 +952,11 @@ async function printRoomReceipt(roomNumber) {
             ".sign-box .name{font-size:16px;font-weight:bold;}" +
             ".sign-box .line{border-top:1px solid #111;margin-top:6px;padding-top:6px;font-size:12px;color:#555;}" +
             ".footer{text-align:center;color:#666;font-size:12px;margin-top:25px;}" +
+            ".box.due{border-color:#f59e0b;background:#fffbeb;}" +
+            ".box.settled{border-color:#16a34a;background:#f0fdf4;}" +
+            ".mention{margin:8px 0 0;font-size:13px;font-weight:bold;}" +
+            ".box.due .mention{color:#b45309;}" +
+            ".box.settled .mention{color:#15803d;}" +
             "@media print{.no-print{display:none;}}" +
             "</style></head><body>" +
             "<div class=\"header\"><h1>HOTEL BELINGA</h1><p>Recu de sejour — Chambre " + escapeHtml(paddedNumber) + "</p><p>Edite le " + escapeHtml(generatedAt) + "</p></div>" +
@@ -609,8 +968,14 @@ async function printRoomReceipt(roomNumber) {
             "<div class=\"row\"><span><strong>Depart</strong></span><span>" + escapeHtml(departure) + "</span></div>" +
             "<div class=\"row\"><span><strong>Nuits</strong></span><span>" + String(nights) + "</span></div>" +
             "<div class=\"row\"><span><strong>Prix / nuit</strong></span><span>" + escapeHtml(formatMoney(room.price)) + "</span></div>" +
+            "<div class=\"row\"><span><strong>Total sejour</strong></span><span>" + escapeHtml(formatMoney(total)) + "</span></div>" +
+            "<div class=\"row\"><span><strong>Paiement par avance</strong></span><span>" + escapeHtml(formatMoney(advance)) + "</span></div>" +
+            lastAdvanceRow +
             "</div>" +
-            "<div class=\"total\">Total : " + escapeHtml(formatMoney(total)) + "</div>" +
+            "<div class=\"box " + balanceBoxClass + "\">" +
+            "<div class=\"row\"><span><strong>Reste a payer</strong></span><span><strong>" + escapeHtml(formatMoney(balanceDue)) + "</strong></span></div>" +
+            "<p class=\"mention\">" + escapeHtml(balanceMention) + "</p>" +
+            "</div>" +
             "<div class=\"signatures\">" +
             "<div class=\"sign-box\"><div class=\"label\">Signature du client</div><div class=\"name\">" + escapeHtml(clientName) + "</div><div class=\"line\">Signature</div></div>" +
             "<div class=\"sign-box\"><div class=\"label\">Le réceptionniste</div><div class=\"name\">" + escapeHtml(receptionistName || "................................") + "</div><div class=\"line\">Nom & signature</div></div>" +
@@ -1177,6 +1542,11 @@ function openRoomModal(room) {
     modalArrivalDate.value = room.arrival_date || "";
     modalDepartureDate.value = room.departure_date || "";
 
+    if (modalAdvancePayment) {
+        const roomAdvance = Number(room.advance_payment || 0);
+        modalAdvancePayment.value = roomAdvance > 0 ? String(roomAdvance) : "";
+    }
+
     // Pre-remplissage : si les dates sont vides, proposer
     // arrivee = aujourd'hui / depart = demain. Ca evite le blocage
     // "dates obligatoires" quand on clique sur Occupee / Reservee.
@@ -1191,6 +1561,7 @@ function openRoomModal(room) {
     }
 
     updateModalHelper(room.status);
+    updateModalAdvancePreview();
     renderModalHistory(room.number);
 
 
@@ -1248,7 +1619,8 @@ function getModalPayload() {
         clientName: modalClientName.value.trim(),
         arrivalDate: modalArrivalDate.value,
         departureDate: modalDepartureDate.value,
-        price: modalPriceSelect ? modalPriceSelect.value : undefined
+        price: modalPriceSelect ? modalPriceSelect.value : undefined,
+        advancePayment: parseAmountInput(modalAdvancePayment ? modalAdvancePayment.value : "")
     };
 
 }
@@ -1289,11 +1661,17 @@ function isSameAsSelectedRoom(status, payload) {
         ? Number(String(payload.price).replace(/[\s ]/g, ""))
         : Number(selectedRoom.price || 0);
 
+    // Une chambre liberee ne conserve pas d'avance (meme regle que le serveur).
+    const expectedAdvance = (status === "Libre" || status === "Nettoyage")
+        ? 0
+        : parseAmountInput(payload.advancePayment);
+
     return selectedRoom.status === status &&
         (selectedRoom.client_name || "") === expectedClient &&
         (selectedRoom.arrival_date || "") === expectedArrival &&
         (selectedRoom.departure_date || "") === expectedDeparture &&
-        Number(selectedRoom.price || 0) === Number(expectedPrice || 0);
+        Number(selectedRoom.price || 0) === Number(expectedPrice || 0) &&
+        Number(selectedRoom.advance_payment || 0) === Number(expectedAdvance || 0);
 
 }
 
@@ -1336,6 +1714,9 @@ async function persistRoomUpdate(nextStatus, payload, { keepOpen = false, succes
             modalClientName.value = "";
             modalArrivalDate.value = "";
             modalDepartureDate.value = "";
+            if (modalAdvancePayment) {
+                modalAdvancePayment.value = "";
+            }
         }
 
         if (modalPriceSelect && updatedRoom && updatedRoom.price) {
@@ -1354,6 +1735,11 @@ async function persistRoomUpdate(nextStatus, payload, { keepOpen = false, succes
             modalArrivalDate.value = updatedRoom.arrival_date || "";
             modalDepartureDate.value = updatedRoom.departure_date || "";
             updateModalHelper(updatedRoom.status);
+            if (modalAdvancePayment) {
+                const savedAdvance = Number(updatedRoom.advance_payment || 0);
+                modalAdvancePayment.value = savedAdvance > 0 ? String(savedAdvance) : "";
+            }
+            updateModalAdvancePreview();
             renderModalHistory(updatedRoom.number);
         } else {
             closeRoomModal();
@@ -1895,7 +2281,8 @@ if (printReceiptButton) {
             alert("Ouvrez d'abord une chambre en cliquant dessus.");
             return;
         }
-        await printRoomReceipt(selectedRoom.number);
+        const modalAdvance = parseAmountInput(modalAdvancePayment ? modalAdvancePayment.value : "");
+        await printRoomReceipt(selectedRoom.number, modalAdvance);
     });
 }
 

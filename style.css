@@ -858,6 +858,30 @@ select {
     line-height: 1.5;
 }
 
+/* Paiement par avance : recapitulatif live dans la fiche chambre */
+.advance-preview {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1d4ed8;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 10px 12px;
+    line-height: 1.6;
+}
+
+.advance-preview.balance-due {
+    color: #b45309;
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.advance-preview.balance-settled {
+    color: #15803d;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
 .history-list {
     display: flex;
     flex-direction: column;
@@ -936,6 +960,42 @@ select {
 
 .modal-action-btn.receipt-btn:hover {
     background: #1e40af;
+}
+
+/* Facture : message d'aide sous les champs (reste à payer, erreurs) */
+.invoice-helper {
+    min-height: 1.2em;
+    margin: 10px 0 0;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.invoice-helper.invoice-ok {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.invoice-helper.invoice-error {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+/* Croix de fermeture de la facture (en-tête du panneau) */
+.panel-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 8px;
+    line-height: 1;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.panel-close:hover {
+    background: #fee2e2;
+    color: #b91c1c;
 }
 
 

@@ -13,6 +13,9 @@ const PORT = 3000;
 const publicDir = __dirname;
 const databasePath = path.join(__dirname, "hotel-belinga.sqlite");
 const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]);
+// Type de ligne utilisee dans le journal des paiements pour tracer un
+// paiement par avance (acompte verse avant / pendant le sejour).
+const ADVANCE_PAYMENT_KIND = "Paiement par avance";
 
 
 function getAllowedPrices(type) {
@@ -50,7 +53,12 @@ function buildDefaultRooms() {
                 client_name: "",
                 arrival_date: "",
                 departure_date: "",
-                updated_at: null
+                advance_payment: 0,
+                // Chaine vide (et non null) : la colonne updated_at est
+                // NOT NULL, et un null insere via INSERT OR REPLACE serait
+                // remplace par CURRENT_TIMESTAMP -> une chambre neuve
+                // afficherait a tort une "derniere modification".
+                updated_at: ""
             });
         }
     };
@@ -225,6 +233,7 @@ function roomColumns() {
         { label: "client_name", get: row => row.client_name || "" },
         { label: "arrival_date", get: row => row.arrival_date || "" },
         { label: "departure_date", get: row => row.departure_date || "" },
+        { label: "advance_payment", get: row => Number(row.advance_payment || 0) },
         { label: "updated_at", get: row => row.updated_at || "" }
     ];
 
@@ -294,6 +303,7 @@ db.exec(`
         client_name TEXT NOT NULL DEFAULT '',
         arrival_date TEXT NOT NULL DEFAULT '',
         departure_date TEXT NOT NULL DEFAULT '',
+        advance_payment INTEGER NOT NULL DEFAULT 0,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -338,7 +348,9 @@ function ensureRoomColumns() {
     const requiredColumns = [
         ["client_name", "TEXT NOT NULL DEFAULT ''"],
         ["arrival_date", "TEXT NOT NULL DEFAULT ''"],
-        ["departure_date", "TEXT NOT NULL DEFAULT ''"]
+        ["departure_date", "TEXT NOT NULL DEFAULT ''"],
+        // Paiement par avance (acompte versé avant / pendant le séjour)
+        ["advance_payment", "INTEGER NOT NULL DEFAULT 0"]
     ];
 
     for (const [columnName, columnDefinition] of requiredColumns) {
@@ -373,7 +385,7 @@ function roomCount() {
 function loadRoomsOrdered() {
 
     return db.prepare(`
-        SELECT number, type, price, status, client_name, arrival_date, departure_date, updated_at
+        SELECT number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
         FROM rooms
         ORDER BY number
     `).all();
@@ -397,8 +409,8 @@ function insertDefaultRooms() {
 
     const insertRoom = db.prepare(`
         INSERT OR REPLACE INTO rooms (
-            number, type, price, status, client_name, arrival_date, departure_date, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const room of buildDefaultRooms()) {
@@ -410,6 +422,7 @@ function insertDefaultRooms() {
             room.client_name,
             room.arrival_date,
             room.departure_date,
+            Number(room.advance_payment || 0),
             room.updated_at
         );
     }
@@ -445,8 +458,8 @@ function migrateLegacyRooms(rooms) {
 
         const insertRoom = db.prepare(`
             INSERT INTO rooms (
-                number, type, price, status, client_name, arrival_date, departure_date, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         desiredRooms.forEach((desiredRoom, index) => {
@@ -460,7 +473,8 @@ function migrateLegacyRooms(rooms) {
                 legacyRoom.client_name || "",
                 legacyRoom.arrival_date || "",
                 legacyRoom.departure_date || "",
-                legacyRoom.updated_at || null
+                Number(legacyRoom.advance_payment || 0),
+                legacyRoom.updated_at || ""
             );
         });
 
@@ -511,8 +525,8 @@ function ensureRoomSeed() {
     const desiredRooms = buildDefaultRooms();
     const insertRoom = db.prepare(`
         INSERT OR IGNORE INTO rooms (
-            number, type, price, status, client_name, arrival_date, departure_date, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const updateRoomType = db.prepare(`
         UPDATE rooms
@@ -534,6 +548,7 @@ function ensureRoomSeed() {
             room.client_name,
             room.arrival_date,
             room.departure_date,
+            Number(room.advance_payment || 0),
             room.updated_at
         );
 
@@ -575,13 +590,13 @@ ensureRoomSeed();
 
 
 const selectRooms = db.prepare(`
-    SELECT number, type, price, status, client_name, arrival_date, departure_date, updated_at
+    SELECT number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
     FROM rooms
     ORDER BY number
 `);
 
 const selectRoomByNumber = db.prepare(`
-    SELECT number, type, price, status, client_name, arrival_date, departure_date, updated_at
+    SELECT number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
     FROM rooms
     WHERE number = ?
 `);
@@ -603,8 +618,26 @@ const selectHistory = db.prepare(`
 
 const updateRoom = db.prepare(`
     UPDATE rooms
-    SET status = ?, client_name = ?, arrival_date = ?, departure_date = ?, price = ?, updated_at = CURRENT_TIMESTAMP
+    SET status = ?, client_name = ?, arrival_date = ?, departure_date = ?, price = ?, advance_payment = ?, updated_at = CURRENT_TIMESTAMP
     WHERE number = ?
+`);
+
+// Somme des avances réellement versées pour une chambre, lues dans le
+// journal des paiements (source de vérité des paiements reçus).
+const sumRoomAdvances = db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM payments
+    WHERE room_number = ? AND kind = ?
+`);
+
+// Report de l'avance d'une facture sur la chambre : la fiche et le reçu
+// affichent ainsi l'avance réellement versée. On ne descend jamais en
+// dessous de l'avance déjà connue (MAX), et uniquement pour les chambres
+// Occupée / Réservée (une chambre Libre / Nettoyage ne garde pas d'avance).
+const reportInvoiceAdvanceToRoom = db.prepare(`
+    UPDATE rooms
+    SET advance_payment = MAX(advance_payment, ?), updated_at = CURRENT_TIMESTAMP
+    WHERE number = ? AND status IN ('Occupée', 'Réservée')
 `);
 
 function checkpointDatabase() {
@@ -688,15 +721,31 @@ function normalizeStatusPayload(body, currentRoom) {
         price = parsed;
     }
 
+    // Paiement par avance (acompte) : montant entier >= 0, facultatif.
+    // Une chambre liberee (Libre / Nettoyage) ne conserve pas d'avance :
+    // l'acompte deja recu reste trace dans le journal des paiements.
+    let advancePayment = Number(currentRoom?.advance_payment || 0);
+    if (body?.advancePayment !== undefined && body?.advancePayment !== null && String(body.advancePayment).trim() !== "") {
+        const parsedAdvance = Number(String(body.advancePayment).replace(/[\s\u00A0]/g, ""));
+        if (!Number.isFinite(parsedAdvance) || parsedAdvance < 0) {
+            return { error: "Montant de paiement par avance invalide (nombre positif attendu)." };
+        }
+        advancePayment = Math.round(parsedAdvance);
+    }
+    if (status === "Libre" || status === "Nettoyage") {
+        advancePayment = 0;
+    }
+
     const payload = {
         status,
         clientName: status === "Libre" || status === "Nettoyage" ? "" : clientName,
         arrivalDate: status === "Libre" || status === "Nettoyage" ? "" : arrivalDate,
         departureDate: status === "Libre" || status === "Nettoyage" ? "" : departureDate,
-        price
+        price,
+        advancePayment
     };
 
-    if (currentRoom && currentRoom.status === payload.status && currentRoom.client_name === payload.clientName && currentRoom.arrival_date === payload.arrivalDate && currentRoom.departure_date === payload.departureDate && Number(currentRoom.price || 0) === Number(payload.price || 0)) {
+    if (currentRoom && currentRoom.status === payload.status && currentRoom.client_name === payload.clientName && currentRoom.arrival_date === payload.arrivalDate && currentRoom.departure_date === payload.departureDate && Number(currentRoom.price || 0) === Number(payload.price || 0) && Number(currentRoom.advance_payment || 0) === Number(payload.advancePayment || 0)) {
         return { payload, unchanged: true };
     }
 
@@ -779,6 +828,175 @@ function recordStayPayment({ roomNumber, roomType, clientName, arrivalDate, depa
 }
 
 
+// Enregistre une avance (acompte) dans le journal des paiements.
+// Contrairement a un sejour, on ne l'annule pas si les nuits valent 0 :
+// l'argent reellement recu doit rester trace.
+function recordAdvancePayment({ roomNumber, roomType, clientName, arrivalDate, departureDate, pricePerNight, amount, note }) {
+
+    const paid = Math.round(Number(amount || 0));
+
+    if (!Number.isFinite(paid) || paid <= 0) return null;
+
+    const nights = calculateNights(arrivalDate, departureDate);
+    const price = Number(pricePerNight || 0);
+
+    db.prepare(`
+        INSERT INTO payments (
+            room_number, room_type, client_name, arrival_date, departure_date,
+            nights, price_per_night, amount, kind, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        roomNumber,
+        roomType || "",
+        clientName || "",
+        arrivalDate || "",
+        departureDate || "",
+        nights,
+        price,
+        paid,
+        ADVANCE_PAYMENT_KIND,
+        note || ""
+    );
+
+    return { nights, price, amount: paid };
+
+}
+
+
+// Crée une facture municipée : ligne "Facture" (total) + ligne
+// "Paiement par avance" (avance), le reste à payer restant calculable
+// comme total - avance. Les deux lignes restent dans le journal des
+// paiements même si la chambre est ensuite libérée.
+function createInvoicePayment({
+    roomNumber,
+    roomType,
+    clientName,
+    arrivalDate,
+    departureDate,
+    pricePerNight,
+    total,
+    advance,
+    receptionist,
+    notePrefix = ""
+}) {
+
+    const nights = calculateNights(arrivalDate, departureDate);
+    const price = Number(pricePerNight || 0);
+    const totalAmount = Math.round(Number(total || 0));
+    const advanceAmount = Math.round(Number(advance || 0));
+
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+        throw new Error("Montant total de la facture invalide (nombre > 0 attendu).");
+    }
+
+    if (!Number.isFinite(advanceAmount) || advanceAmount < 0) {
+        throw new Error("Montant de l'avance invalide (nombre >= 0 attendu).");
+    }
+
+    if (advanceAmount > totalAmount) {
+        throw new Error("L'avance ne peut pas dépasser le montant total de la facture.");
+    }
+
+    const note = [notePrefix, `Réceptionniste : ${receptionist || "-"}`]
+        .filter(Boolean)
+        .join(" — ")
+        .trim();
+
+    const invoiceNote = note ? `Facture — ${note}` : "Facture";
+    const advanceNote = note ? `Avance (${note})` : "Paiement par avance";
+
+    db.prepare(`INSERT INTO payments (
+        room_number, room_type, client_name, arrival_date, departure_date,
+        nights, price_per_night, amount, kind, note
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        roomNumber,
+        roomType || "",
+        clientName || "",
+        arrivalDate || "",
+        departureDate || "",
+        nights,
+        price,
+        totalAmount,
+        "Facture",
+        invoiceNote
+    );
+
+    let advanceRecord = null;
+    if (advanceAmount > 0) {
+        advanceRecord = db.prepare(`INSERT INTO payments (
+            room_number, room_type, client_name, arrival_date, departure_date,
+            nights, price_per_night, amount, kind, note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+            roomNumber,
+            roomType || "",
+            clientName || "",
+            arrivalDate || "",
+            departureDate || "",
+            nights,
+            price,
+            advanceAmount,
+            ADVANCE_PAYMENT_KIND,
+            advanceNote
+        );
+    }
+
+    // Report de l'avance sur la chambre : la fiche et le reçu affichent
+    // l'avance réellement versée dès la création de la facture.
+    if (advanceAmount > 0 && Number(roomNumber) > 0) {
+        reportInvoiceAdvanceToRoom.run(advanceAmount, roomNumber);
+    }
+
+    const created_at = new Date().toISOString();
+    const invoiceRow = {
+        id: null,
+        room_number: roomNumber,
+        room_type: roomType || "",
+        client_name: clientName || "",
+        arrival_date: arrivalDate || "",
+        departure_date: departureDate || "",
+        nights,
+        price_per_night: price,
+        amount: totalAmount,
+        kind: "Facture",
+        note: invoiceNote,
+        created_at
+    };
+
+    return {
+        invoice: {
+            ...invoiceRow,
+            total: totalAmount,
+            advance: advanceAmount,
+            balance: totalAmount - advanceAmount
+        },
+        advance_payment: advanceRecord
+            ? {
+                id: advanceRecord.lastInsertRowid,
+                room_number: roomNumber,
+                amount: advanceAmount,
+                note: advanceNote,
+                created_at
+            }
+            : null
+    };
+
+}
+
+
+// Historique des avances enregistrees pour une chambre (utilise sur la facture).
+function loadRoomAdvancePayments(roomNumber, limit = 20) {
+
+    return db.prepare(`
+        SELECT id, amount, note, created_at
+        FROM payments
+        WHERE room_number = ? AND kind = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+    `).all(roomNumber, ADVANCE_PAYMENT_KIND, limit);
+
+}
+
+
 
 
 function handleExport(res, type) {
@@ -813,6 +1031,79 @@ function handleExport(res, type) {
     }
 
     return sendText(res, 404, "Export introuvable.");
+
+}
+
+
+// Création d'une facture via POST /api/payments.
+// Le body JSON attend : roomNumber, total, advance (facultatif), note (facultatif),
+// receptionist (facultatif). Si roomNumber est fourni, on utilise la chambre pour
+// remplir type, client, dates et prix/nuit ; sinon ces champs doivent être fournis.
+async function createInvoiceRoute(req, res) {
+
+    const body = await readJsonBody(req);
+
+    const roomNumber = Number(body?.roomNumber);
+    const total = body?.total;
+    const advance = body?.advance ?? 0;
+    const note = typeof body?.note === "string" ? body.note.trim() : "";
+    const receptionist = typeof body?.receptionist === "string" ? body.receptionist.trim() : "";
+
+    if (!Number.isInteger(roomNumber) || roomNumber <= 0) {
+        return sendText(res, 400, "Champs obligatoires : roomNumber (numero de chambre entier > 0).");
+    }
+
+    if (total === undefined || total === null || String(total).trim() === "") {
+        return sendText(res, 400, "Champs obligatoires : total (montant total de la facture > 0).");
+    }
+
+    const totalAmount = Math.round(Number(total));
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+        return sendText(res, 400, "Champs invalides : total doit être un nombre > 0.");
+    }
+
+    const advanceAmount = Math.round(Number(advance || 0));
+    if (!Number.isFinite(advanceAmount) || advanceAmount < 0) {
+        return sendText(res, 400, "Champs invalides : advance doit être un nombre >= 0.");
+    }
+
+    if (advanceAmount > totalAmount) {
+        return sendText(res, 400, "L'avance ne peut pas dépasser le montant total de la facture.");
+    }
+
+    let room = null;
+    if (roomNumber) {
+        room = selectRoomByNumber.get(roomNumber);
+        if (!room) {
+            return sendText(res, 404, "Chambre introuvable : " + roomNumber + ".");
+        }
+    }
+
+    const roomType = room ? room.type : (body?.roomType || "");
+    const clientName = room ? room.client_name : (body?.clientName || "");
+    const arrivalDate = room ? room.arrival_date : (body?.arrivalDate || "");
+    const departureDate = room ? room.departure_date : (body?.departureDate || "");
+    const pricePerNight = room ? room.price : (Number(body?.pricePerNight) || 0);
+
+    try {
+        const result = createInvoicePayment({
+            roomNumber,
+            roomType,
+            clientName,
+            arrivalDate,
+            departureDate,
+            pricePerNight,
+            total: totalAmount,
+            advance: advanceAmount,
+            receptionist,
+            notePrefix: note
+        });
+
+        return sendJson(res, 201, result);
+    } catch (error) {
+        console.error("Facture non creee :", error.message);
+        return sendText(res, 400, error.message || "Impossible de creer la facture.");
+    }
 
 }
 
@@ -906,12 +1197,23 @@ const server = http.createServer(async (req, res) => {
 
             const nights = calculateNights(room.arrival_date, room.departure_date);
             const total = nights > 0 ? nights * Number(room.price || 0) : 0;
+            // Avance du reçu = la plus élevée entre l'avance connue de la
+            // chambre et la somme des avances versées dans le journal des
+            // paiements (chaque facture avec acompte y inscrit une ligne).
+            const journalAdvances = sumRoomAdvances.get(number, ADVANCE_PAYMENT_KIND);
+            const advance = Math.max(
+                Number(room.advance_payment || 0),
+                Number(journalAdvances?.total || 0)
+            );
             const history = selectRoomHistory.all(number, 20);
 
             return sendJson(res, 200, {
                 room,
                 nights,
                 total,
+                advance,
+                balance: total - advance,
+                advance_payments: loadRoomAdvancePayments(number, 20),
                 history,
                 generated_at: new Date().toISOString()
             });
@@ -943,6 +1245,14 @@ const server = http.createServer(async (req, res) => {
             return sendText(res, 403, "Journal des paiements verrouillé : utilisez le reset complet (npm run reset) pour l'effacer.");
         }
 
+        // Création d'une facture (total + avance + reste à payer).
+        // Deux lignes sont enregistrées dans le journal : une "Facture" et,
+        // si l'avance > 0, un "Paiement par avance". Le reste à payer reste
+        // toujours calculable côté client via total - avance.
+        if (req.method === "POST" && pathname === "/api/payments") {
+            return createInvoiceRoute(req, res);
+        }
+
 
         if (req.method === "PUT" && pathname.startsWith("/api/rooms/")) {
 
@@ -968,7 +1278,7 @@ const server = http.createServer(async (req, res) => {
             const { payload, unchanged } = normalized;
 
             if (!unchanged) {
-                updateRoom.run(payload.status, payload.clientName, payload.arrivalDate, payload.departureDate, payload.price, number);
+                updateRoom.run(payload.status, payload.clientName, payload.arrivalDate, payload.departureDate, payload.price, Number(payload.advancePayment || 0), number);
                 checkpointDatabase();
                 insertHistory.run(
                     number,
@@ -978,6 +1288,24 @@ const server = http.createServer(async (req, res) => {
                     payload.arrivalDate,
                     payload.departureDate
                 );
+
+                // --- Paiement par avance : chaque montant saisi ou modifie
+                // est trace dans le journal des paiements (jamais efface). ---
+                const previousAdvance = Number(currentRoom.advance_payment || 0);
+                const nextAdvance = Number(payload.advancePayment || 0);
+
+                if (nextAdvance !== previousAdvance && nextAdvance > 0) {
+                    recordAdvancePayment({
+                        roomNumber: number,
+                        roomType: currentRoom.type,
+                        clientName: payload.clientName || currentRoom.client_name,
+                        arrivalDate: payload.arrivalDate || currentRoom.arrival_date,
+                        departureDate: payload.departureDate || currentRoom.departure_date,
+                        pricePerNight: payload.price,
+                        amount: nextAdvance,
+                        note: `Avance ${previousAdvance.toLocaleString("fr-FR")} → ${nextAdvance.toLocaleString("fr-FR")} FCFA`
+                    });
+                }
 
                 // --- Journal des paiements (reste enregistré même après un
                 // départ anticipé ou un passage à Libre) ---

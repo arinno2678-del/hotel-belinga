@@ -9,7 +9,7 @@
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
 
-    <link rel="stylesheet" href="style.css?v=8">
+    <link rel="stylesheet" href="style.css?v=10">
 
     <link rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -554,6 +554,18 @@
 
                         </div>
 
+                        <label for="modalAdvancePayment">Paiement par avance (FCFA)</label>
+                        <input
+                            type="number"
+                            id="modalAdvancePayment"
+                            min="0"
+                            step="500"
+                            inputmode="numeric"
+                            placeholder="Montant déjà versé (0 si aucun)"
+                        >
+
+                        <p class="advance-preview" id="modalAdvancePreview"></p>
+
                         <p class="modal-helper" id="modalHelperText">
                             Pour un départ anticipé : avancez la date de départ et/ou
                             changez le tarif, puis cliquez « Enregistrer les modifications ».
@@ -588,6 +600,10 @@
                         <button class="modal-action-btn receipt-btn" id="printReceiptBtn" type="button">
                             <i class="fa-solid fa-print"></i>
                             Imprimer reçu PDF
+                        </button>
+                        <button class="modal-action-btn invoice-btn" id="invoiceBtn" type="button">
+                            <i class="fa-solid fa-file-invoice"></i>
+                            Facture
                         </button>
                     </div>
 
@@ -628,6 +644,78 @@
 
                 </div>
 
+            <div class="modal-panel invoice-panel" id="invoicePanel" hidden>
+                <div class="panel-head">
+                    <div>
+                        <h3>Facture — paiement par avance</h3>
+                        <p>Crée une facture avec un montant total, un acompte versé et le reste à payer.</p>
+                    </div>
+                    <button class="panel-close" id="invoiceCloseBtn" type="button" title="Fermer la facture" aria-label="Fermer la facture">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="invoice-fields">
+
+                    <label for="invoiceTotal">Montant total de la facture (FCFA)</label>
+                    <input
+                        type="number"
+                        id="invoiceTotal"
+                        min="1"
+                        step="1000"
+                        inputmode="numeric"
+                        placeholder="Ex : 300000"
+                    >
+
+                    <label for="invoiceAdvance">Avance versée (FCFA)</label>
+                    <input
+                        type="number"
+                        id="invoiceAdvance"
+                        min="0"
+                        step="1000"
+                        inputmode="numeric"
+                        placeholder="0 si aucun acompte"
+                    >
+
+                    <label for="invoiceReceptionist">Réceptionniste (signature)</label>
+                    <input
+                        type="text"
+                        id="invoiceReceptionist"
+                        placeholder="Nom du réceptionniste"
+                        autocomplete="name"
+                    >
+
+                    <label for="invoiceNote">Note (facultatif)</label>
+                    <textarea
+                        id="invoiceNote"
+                        rows="2"
+                        placeholder="Ex : Séjour du 01/10 au 03/10"
+                    ></textarea>
+
+                    <div class="invoice-summary" id="invoiceSummary" hidden>
+                        <div class="invoice-summary-row">
+                            <span>Total facture</span>
+                            <strong id="invoiceTotalDisplay"></strong>
+                        </div>
+                        <div class="invoice-summary-row">
+                            <span>Avance versée</span>
+                            <strong id="invoiceAdvanceDisplay"></strong>
+                        </div>
+                        <div class="invoice-summary-row balance-row">
+                            <span>Reste à payer</span>
+                            <strong id="invoiceBalanceDisplay"></strong>
+                        </div>
+                    </div>
+
+                    <p class="invoice-helper" id="invoiceHelper"></p>
+
+                    <button class="invoice-create-btn" id="invoiceCreateBtn" type="button">
+                        <i class="fa-solid fa-check"></i>
+                        Créer la facture
+                    </button>
+
+                </div>
+            </div>
             </div>
 
         </div>
@@ -635,7 +723,7 @@
     </div>
 
 
-    <script src="script.js?v=17"></script>
+    <script src="script.js?v=20"></script>
 
 </body>
 </html>
