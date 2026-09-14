@@ -88,8 +88,6 @@ const paymentsList = document.getElementById("paymentsList");
 
 const paymentsTotal = document.getElementById("paymentsTotal");
 
-const paymentsRecordedTotal = document.getElementById("paymentsRecordedTotal");
-
 const paymentsHistoryList = document.getElementById("paymentsHistoryList");
 
 const paymentsHistoryCount = document.getElementById("paymentsHistoryCount");
@@ -1767,11 +1765,6 @@ async function renderPaymentsHistory() {
     if (!paymentsHistoryList) return;
 
     const rows = await loadPaymentsHistory();
-    const totalAmount = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-
-    if (paymentsRecordedTotal) {
-        paymentsRecordedTotal.textContent = formatMoney(totalAmount);
-    }
 
     if (paymentsHistoryCount) {
         paymentsHistoryCount.textContent = String(rows.length);
