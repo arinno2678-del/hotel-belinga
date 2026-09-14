@@ -801,6 +801,7 @@ function closeRoomModal() {
 
     roomModal.classList.remove("show");
     selectedRoom = null;
+    document.body.style.overflow = "";
 
 }
 
@@ -1015,6 +1016,19 @@ function renderRooms() {
 
         });
 
+        // Accessibilité tactile + clavier : la carte est activable au doigt et à Entrée/Espace.
+        card.setAttribute("tabindex", "0");
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `Ouvrir la chambre ${formatRoomNumber(room.number)}`);
+        card.addEventListener("keydown", (event) => {
+
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openRoomModal(room);
+            }
+
+        });
+
 
         roomsGrid.appendChild(card);
 
@@ -1059,18 +1073,27 @@ function openRoomModal(room) {
 
 
     roomModal.classList.add("show");
+    document.body.style.overflow = "hidden";
 
-    requestAnimationFrame(() => {
+    // Sur mobile on ne force pas le focus (sinon le clavier s'ouvre tout seul
+    // et cache la fiche). Focus seulement sur desktop à pointeur fin.
+    const canFocus = window.matchMedia
+        ? window.matchMedia("(pointer: fine)").matches && window.innerWidth > 900
+        : window.innerWidth > 900;
 
-        if (document.activeElement && document.activeElement.blur) {
-            document.activeElement.blur();
-        }
+    if (canFocus) {
+        requestAnimationFrame(() => {
 
-        if (!modalClientName.value) {
-            modalClientName.focus({ preventScroll: true });
-        }
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
 
-    });
+            if (!modalClientName.value) {
+                modalClientName.focus({ preventScroll: true });
+            }
+
+        });
+    }
 
 }
 

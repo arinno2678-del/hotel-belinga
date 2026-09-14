@@ -4,6 +4,11 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -11,7 +16,24 @@ body {
     background: #f4f6fb;
     color: #1f2937;
     min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
+    overscroll-behavior-y: none;
+}
+
+button,
+select,
+input,
+.room-card {
+    touch-action: manipulation;
+}
+
+button {
+    min-height: 44px;
+}
+
+img {
+    max-width: 100%;
 }
 
 /* =========================
@@ -635,6 +657,8 @@ select {
 
 .table-shell {
     overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
 }
 
 .data-table {
@@ -706,10 +730,12 @@ select {
     right: 15px;
     border: none;
     background: #f1f5f9;
-    width: 35px;
-    height: 35px;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
     border-radius: 50%;
     cursor: pointer;
+    font-size: 16px;
 }
 
 .modal-header {
@@ -926,20 +952,63 @@ select {
 
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
 
-    .sidebar {
-        width: 70px;
-        padding: 20px 8px;
+    /* Tablette portrait : la sidebar devient une barre de navigation basse,
+       toujours accessible au pouce sur écran tactile. */
+    body {
+        flex-direction: column;
     }
 
-    .logo span,
+    .sidebar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: auto;
+        bottom: 0;
+        width: 100%;
+        min-height: 0;
+        flex-direction: row;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+        z-index: 50;
+        border-top: 1px solid #26334d;
+    }
+
+    .logo {
+        display: none;
+    }
+
+    nav {
+        flex-direction: row;
+        flex: 1;
+        gap: 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    nav::-webkit-scrollbar {
+        display: none;
+    }
+
     .nav-btn {
-        font-size: 0;
+        flex: 1 0 auto;
+        min-width: 64px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 10px;
+        padding: 8px 6px;
+        text-align: center;
+        white-space: nowrap;
     }
 
     .nav-btn i {
-        font-size: 20px;
+        width: auto;
+        font-size: 19px;
     }
 
     .sidebar-footer {
@@ -947,10 +1016,14 @@ select {
     }
 
     .main-content {
-        margin-left: 70px;
-        width: calc(100% - 70px);
-        padding: 20px;
+        margin-left: 0;
+        width: 100%;
+        padding: 20px 16px calc(110px + env(safe-area-inset-bottom));
     }
+
+}
+
+@media (max-width: 768px) {
 
     .header {
         flex-direction: column;
@@ -966,11 +1039,56 @@ select {
 
     .room-actions {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .room-actions .search-box,
+    .room-actions select,
+    .room-actions button {
+        width: 100%;
     }
 
     .modal-grid,
     .room-fields-inline {
         grid-template-columns: 1fr;
+    }
+
+    .modal {
+        padding: 12px;
+        align-items: flex-end;
+    }
+
+    .modal-content {
+        max-height: calc(100dvh - 24px);
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    .modal-actions,
+    .status-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-actions .modal-action-btn,
+    .status-buttons .status-btn,
+    .save-changes-btn,
+    .early-checkout-btn {
+        min-height: 48px;
+        font-size: 15px;
+    }
+
+    .room-fields input,
+    .room-fields select,
+    .price-row select,
+    .search-box input,
+    select {
+        font-size: 16px;
+    }
+
+    .highlight-metric {
+        align-items: flex-start;
     }
 
     .data-table {
@@ -990,6 +1108,27 @@ select {
         grid-template-columns: 1fr;
     }
 
+    .rooms-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .room-card {
+        padding: 16px;
+    }
+
+    .room-number {
+        font-size: 19px;
+    }
+
+    .header h1 {
+        font-size: 24px;
+    }
+
+    .main-content {
+        padding: 16px 12px calc(120px + env(safe-area-inset-bottom));
+    }
+
     .rooms-header {
         flex-direction: column;
         align-items: flex-start;
@@ -998,6 +1137,16 @@ select {
 
     .modal-content {
         padding: 20px;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .price-row {
+        flex-wrap: wrap;
+    }
+
+    .price-row select {
+        max-width: 100%;
+        width: 100%;
     }
 
     .history-entry-head {
@@ -1005,4 +1154,17 @@ select {
         align-items: flex-start;
     }
 
+}
+
+/* Écrans tactiles : pas d'effet hover collant, feedback au toucher */
+@media (hover: none) and (pointer: coarse) {
+    .room-card:hover { transform: none; }
+    .room-card:active { transform: scale(0.98); }
+    .nav-btn:hover { background: transparent; }
+    .nav-btn.active { background: #26334d; }
+}
+
+/* Réduction des animations si l'utilisateur le demande */
+@media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
 }
