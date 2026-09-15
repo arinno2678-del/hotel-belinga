@@ -658,6 +658,22 @@ const server = http.createServer(async (req, res) => {
         }
 
 
+        // Diagnostic : quel moteur de données est actif ?
+        // Permet de vérifier à distance que PostgreSQL (DATABASE_URL)
+        // est bien utilisé sur Render — sinon bascule SQLite éphémère.
+        if (req.method === "GET" && pathname === "/api/health") {
+            return sendJson(res, 200, {
+                ok: true,
+                driver: db.driver,
+                database: db.driver === "postgres"
+                    ? "PostgreSQL — donnees persistantes"
+                    : "SQLite locale — donnees EPHEMERES sur Render (DATABASE_URL manquant)",
+                rooms: (await db.getRooms()).length,
+                time: new Date().toISOString()
+            });
+        }
+
+
         if (req.method === "GET" && pathname === "/api/rooms") {
 
             const rooms = await db.getRooms();
