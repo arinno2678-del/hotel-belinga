@@ -3,85 +3,16 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DatabaseSync } from "node:sqlite";
+import { createStorage, getAllowedPrices, ADVANCE_PAYMENT_KIND } from "./db.js";
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = 3000;
+// PORT : Render fournit process.env.PORT — on l'écoute s'il existe.
+const PORT = Number(process.env.PORT) || 3000;
 const publicDir = __dirname;
-const databasePath = path.join(__dirname, "hotel-belinga.sqlite");
 const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]);
-// Type de ligne utilisee dans le journal des paiements pour tracer un
-// paiement par avance (acompte verse avant / pendant le sejour).
-const ADVANCE_PAYMENT_KIND = "Paiement par avance";
-
-
-function getAllowedPrices(type) {
-    const normalized = String(type || "");
-    if (normalized === "VIP") return [70000, 60000, 50000];
-    if (normalized === "Standard") return [45000, 40000, 35000, 30000];
-    if (normalized === "Suite Junior") return [200000, 150000];
-    if (normalized === "Suite Ministérielle") return [300000, 250000];
-    if (normalized === "Suite Nuptiale") return [350000];
-    // Anciens types "Suite" générique (avant la mise à jour) : on accepte les 5 tarifs
-    if (normalized === "Suite") return [350000, 300000, 250000, 200000, 150000];
-    return [];
-}
-
-
-function defaultPriceFor(type, fallback = 0) {
-    const allowed = getAllowedPrices(type);
-    if (allowed.length > 0) return allowed[0];
-    const numeric = Number(fallback);
-    return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
-}
-
-
-function buildDefaultRooms() {
-
-    const rooms = [];
-
-    const pushRange = (start, end, type, price) => {
-        for (let i = start; i <= end; i++) {
-            rooms.push({
-                number: i,
-                type,
-                price,
-                status: "Libre",
-                client_name: "",
-                arrival_date: "",
-                departure_date: "",
-                advance_payment: 0,
-                // Chaine vide (et non null) : la colonne updated_at est
-                // NOT NULL, et un null insere via INSERT OR REPLACE serait
-                // remplace par CURRENT_TIMESTAMP -> une chambre neuve
-                // afficherait a tort une "derniere modification".
-                updated_at: ""
-            });
-        }
-    };
-
-    // VIP : chambres 01 a 14 (70 000, 60 000 ou 50 000 FCFA)
-    pushRange(1, 7, "VIP", 70000);
-    pushRange(8, 14, "VIP", 60000);
-
-    // Standard : 45 000, 40 000, 35 000 ou 30 000 FCFA (35 chambres : 15 -> 49)
-    pushRange(15, 32, "Standard", 45000);
-    pushRange(33, 49, "Standard", 35000);
-
-    // 3 Suites uniquement :
-    // 50 = Suite Junior (choix 200 000 ou 150 000)
-    // 51 = Suite Ministérielle (choix 300 000 ou 250 000)
-    // 52 = Suite Nuptiale (350 000 fixe)
-    pushRange(50, 50, "Suite Junior", 200000);
-    pushRange(51, 51, "Suite Ministérielle", 300000);
-    pushRange(52, 52, "Suite Nuptiale", 350000);
-
-    return rooms;
-
-}
 
 
 function escapeCsv(value) {
@@ -265,403 +196,31 @@ function parsePositiveInt(value, fallback) {
 }
 
 
-function escapeSqlLikeValue(value) {
-
-    return String(value).replace(/'/g, "''");
-
-}
-
-
-const db = new DatabaseSync(databasePath);
-
-// PRAGMA critiques, exécutés UN PAR UN : db.exec() peut ignorer les
-// instructions suivantes dans certaines versions, donc on garantit ici que
-// la durabilité est bien active (synchronous = FULL => pas de perte de
-// données si le serveur est arrêté brutalement ou si le PC s'éteint).
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA synchronous = FULL;");
-db.exec("PRAGMA busy_timeout = 5000;");
-db.exec("PRAGMA foreign_keys = ON;");
-
-try {
-    const journalMode = db.prepare("PRAGMA journal_mode;").get();
-    const syncMode = db.prepare("PRAGMA synchronous;").get();
-    console.log(
-        "SQLite : journal_mode=" + (journalMode && journalMode.journal_mode) +
-        " | synchronous=" + (syncMode && syncMode.synchronous) + " (2 = FULL)"
-    );
-} catch (error) {
-    console.error("Verification des PRAGMA impossible :", error.message);
-}
-
-db.exec(`
-    CREATE TABLE IF NOT EXISTS rooms (
-        number INTEGER PRIMARY KEY,
-        type TEXT NOT NULL,
-        price INTEGER NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('Libre', 'Occupée', 'Réservée', 'Nettoyage')),
-        client_name TEXT NOT NULL DEFAULT '',
-        arrival_date TEXT NOT NULL DEFAULT '',
-        departure_date TEXT NOT NULL DEFAULT '',
-        advance_payment INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS room_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room_number INTEGER NOT NULL,
-        previous_status TEXT NOT NULL DEFAULT '',
-        new_status TEXT NOT NULL,
-        client_name TEXT NOT NULL DEFAULT '',
-        arrival_date TEXT NOT NULL DEFAULT '',
-        departure_date TEXT NOT NULL DEFAULT '',
-        changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS payments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room_number INTEGER NOT NULL,
-        room_type TEXT NOT NULL DEFAULT '',
-        client_name TEXT NOT NULL DEFAULT '',
-        arrival_date TEXT NOT NULL DEFAULT '',
-        departure_date TEXT NOT NULL DEFAULT '',
-        nights INTEGER NOT NULL DEFAULT 0,
-        price_per_night INTEGER NOT NULL DEFAULT 0,
-        amount INTEGER NOT NULL DEFAULT 0,
-        kind TEXT NOT NULL DEFAULT 'Séjour',
-        note TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-`);
-
-
-function getTableColumns(tableName) {
-
-    return db.prepare(`PRAGMA table_info(${tableName})`).all().map(row => row.name);
-
-}
-
-
-function ensureRoomColumns() {
-
-    const columns = new Set(getTableColumns("rooms"));
-    const requiredColumns = [
-        ["client_name", "TEXT NOT NULL DEFAULT ''"],
-        ["arrival_date", "TEXT NOT NULL DEFAULT ''"],
-        ["departure_date", "TEXT NOT NULL DEFAULT ''"],
-        // Paiement par avance (acompte versé avant / pendant le séjour)
-        ["advance_payment", "INTEGER NOT NULL DEFAULT 0"]
-    ];
-
-    for (const [columnName, columnDefinition] of requiredColumns) {
-        if (!columns.has(columnName)) {
-            db.exec(`ALTER TABLE rooms ADD COLUMN ${columnName} ${columnDefinition};`);
-        }
-    }
-
-    const paymentColumns = new Set(getTableColumns("payments"));
-    const requiredPaymentColumns = [
-        ["room_type", "TEXT NOT NULL DEFAULT ''"],
-        ["kind", "TEXT NOT NULL DEFAULT 'Séjour'"],
-        ["note", "TEXT NOT NULL DEFAULT ''"]
-    ];
-
-    for (const [columnName, columnDefinition] of requiredPaymentColumns) {
-        if (!paymentColumns.has(columnName)) {
-            db.exec(`ALTER TABLE payments ADD COLUMN ${columnName} ${columnDefinition};`);
-        }
-    }
-
-}
-
-
-function roomCount() {
-
-    return db.prepare("SELECT COUNT(*) AS count FROM rooms").get().count;
-
-}
-
-
-function loadRoomsOrdered() {
-
-    return db.prepare(`
-        SELECT number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
-        FROM rooms
-        ORDER BY number
-    `).all();
-
-}
-
-
-function loadHistoryOrdered(limit = 100) {
-
-    return db.prepare(`
-        SELECT id, room_number, previous_status, new_status, client_name, arrival_date, departure_date, changed_at
-        FROM room_history
-        ORDER BY changed_at DESC, id DESC
-        LIMIT ?
-    `).all(limit);
-
-}
-
-
-function insertDefaultRooms() {
-
-    const insertRoom = db.prepare(`
-        INSERT OR REPLACE INTO rooms (
-            number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    for (const room of buildDefaultRooms()) {
-        insertRoom.run(
-            room.number,
-            room.type,
-            room.price,
-            room.status,
-            room.client_name,
-            room.arrival_date,
-            room.departure_date,
-            Number(room.advance_payment || 0),
-            room.updated_at
-        );
-    }
-
-}
-
-
-function needsLegacyMigration(rooms) {
-
-    return rooms.some(room => room.number < 1 || room.number > 52);
-
-}
-
-
-function migrateLegacyRooms(rooms) {
-
-    const desiredRooms = buildDefaultRooms();
-    const sortedLegacyRooms = [...rooms].sort((a, b) => a.number - b.number);
-
-    const mapping = new Map();
-    sortedLegacyRooms.forEach((room, index) => {
-        const target = desiredRooms[index];
-        if (target) {
-            mapping.set(room.number, target.number);
-        }
-    });
-
-    db.exec("BEGIN IMMEDIATE TRANSACTION");
-
-    try {
-
-        db.exec("DELETE FROM rooms");
-
-        const insertRoom = db.prepare(`
-            INSERT INTO rooms (
-                number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-
-        desiredRooms.forEach((desiredRoom, index) => {
-            const legacyRoom = sortedLegacyRooms[index] || {};
-
-            insertRoom.run(
-                desiredRoom.number,
-                desiredRoom.type,
-                desiredRoom.price,
-                legacyRoom.status || desiredRoom.status,
-                legacyRoom.client_name || "",
-                legacyRoom.arrival_date || "",
-                legacyRoom.departure_date || "",
-                Number(legacyRoom.advance_payment || 0),
-                legacyRoom.updated_at || ""
-            );
-        });
-
-        if (mapping.size > 0) {
-            const caseSql = Array.from(mapping.entries())
-                .map(([oldNumber, newNumber]) => `WHEN ${oldNumber} THEN ${newNumber}`)
-                .join(" ");
-
-            const inClause = Array.from(mapping.keys()).join(",");
-
-            if (inClause.length > 0) {
-                db.exec(`
-                    UPDATE room_history
-                    SET room_number = CASE room_number ${caseSql} ELSE room_number END
-                    WHERE room_number IN (${inClause})
-                `);
-            }
-        }
-
-        db.exec("COMMIT");
-
-    } catch (error) {
-
-        db.exec("ROLLBACK");
-        throw error;
-
-    }
-
-}
-
-
-function ensureRoomSeed() {
-
-    ensureRoomColumns();
-
-    const currentRooms = loadRoomsOrdered();
-
-    if (currentRooms.length === 0) {
-        insertDefaultRooms();
-        return;
-    }
-
-    if (needsLegacyMigration(currentRooms)) {
-        migrateLegacyRooms(currentRooms);
-        return;
-    }
-
-    const desiredRooms = buildDefaultRooms();
-    const insertRoom = db.prepare(`
-        INSERT OR IGNORE INTO rooms (
-            number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const updateRoomType = db.prepare(`
-        UPDATE rooms
-        SET type = ?
-        WHERE number = ?
-    `);
-    const updateRoomPrice = db.prepare(`
-        UPDATE rooms
-        SET price = ?
-        WHERE number = ?
-    `);
-
-    for (const room of desiredRooms) {
-        insertRoom.run(
-            room.number,
-            room.type,
-            room.price,
-            room.status,
-            room.client_name,
-            room.arrival_date,
-            room.departure_date,
-            Number(room.advance_payment || 0),
-            room.updated_at
-        );
-
-        const existing = db.prepare("SELECT type, price FROM rooms WHERE number = ?").get(room.number);
-        if (existing && existing.type !== room.type) {
-            updateRoomType.run(room.type, room.number);
-        }
-        // Prix : on corrige seulement si le prix actuel n'est pas un tarif
-        // autorisé pour ce type (ex: ancien 25 000 / 50 000 / 80 000).
-        // On ne touche PAS au choix 70 000 vs 60 000 déjà fait.
-        if (existing) {
-            const allowed = getAllowedPrices(room.type);
-            if (allowed.length > 0 && !allowed.includes(Number(existing.price))) {
-                updateRoomPrice.run(room.price, room.number);
-            }
-        }
-    }
-
-}
-
-
-function resetDatabase() {
-
-    db.exec("DELETE FROM room_history");
-    db.exec("DELETE FROM payments");
-    db.exec("DELETE FROM rooms");
-    insertDefaultRooms();
-
-}
-
+// -------------------------------------------------------------
+// Base de données : PostgreSQL si DATABASE_URL est défini (Render /
+// Neon — les données persistent après chaque redéploiement), sinon
+// SQLite locale (npm start, comportement inchangé).
+// Schéma, seed des 52 chambres et migrations : voir db.js.
+// -------------------------------------------------------------
+const db = await createStorage();
+await db.init();
 
 if (process.argv.includes("--reset")) {
-    resetDatabase();
+    await db.resetAll();
     console.log("Base reinitialisee : 52 chambres Libres, historique et journal des paiements vides.");
 }
 
 
-ensureRoomSeed();
+// (Schéma, migrations de colonnes et seed : gérés par db.js)
 
 
-const selectRooms = db.prepare(`
-    SELECT number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
-    FROM rooms
-    ORDER BY number
-`);
+// (Insertion des chambres par défaut et migration legacy : gérées par db.js)
 
-const selectRoomByNumber = db.prepare(`
-    SELECT number, type, price, status, client_name, arrival_date, departure_date, advance_payment, updated_at
-    FROM rooms
-    WHERE number = ?
-`);
 
-const selectRoomHistory = db.prepare(`
-    SELECT id, room_number, previous_status, new_status, client_name, arrival_date, departure_date, changed_at
-    FROM room_history
-    WHERE room_number = ?
-    ORDER BY changed_at DESC, id DESC
-    LIMIT ?
-`);
+// (Seed initial et reset complet : gérés par db.js init() / resetAll())
 
-const selectHistory = db.prepare(`
-    SELECT id, room_number, previous_status, new_status, client_name, arrival_date, departure_date, changed_at
-    FROM room_history
-    ORDER BY changed_at DESC, id DESC
-    LIMIT ?
-`);
 
-const updateRoom = db.prepare(`
-    UPDATE rooms
-    SET status = ?, client_name = ?, arrival_date = ?, departure_date = ?, price = ?, advance_payment = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE number = ?
-`);
-
-// Somme des avances réellement versées pour une chambre, lues dans le
-// journal des paiements (source de vérité des paiements reçus).
-const sumRoomAdvances = db.prepare(`
-    SELECT COALESCE(SUM(amount), 0) AS total
-    FROM payments
-    WHERE room_number = ? AND kind = ?
-`);
-
-// Report de l'avance d'une facture sur la chambre : la fiche et le reçu
-// affichent ainsi l'avance réellement versée. On ne descend jamais en
-// dessous de l'avance déjà connue (MAX), et uniquement pour les chambres
-// Occupée / Réservée (une chambre Libre / Nettoyage ne garde pas d'avance).
-const reportInvoiceAdvanceToRoom = db.prepare(`
-    UPDATE rooms
-    SET advance_payment = MAX(advance_payment, ?), updated_at = CURRENT_TIMESTAMP
-    WHERE number = ? AND status IN ('Occupée', 'Réservée')
-`);
-
-function checkpointDatabase() {
-    try {
-        db.exec("PRAGMA wal_checkpoint(PASSIVE);");
-    } catch (error) {
-        console.error("Checkpoint WAL impossible :", error.message);
-    }
-}
-
-// Checkpoint périodique : garde le fichier -wal petit et garantit que les
-// écritures sont bien recopiées dans hotel-belinga.sqlite, même si le
-// serveur tourne pendant des heures.
-const checkpointTimer = setInterval(() => {
-    checkpointDatabase();
-}, 5 * 60 * 1000);
-
-checkpointTimer.unref();
-
-const insertHistory = db.prepare(`
-    INSERT INTO room_history (
-        room_number, previous_status, new_status, client_name, arrival_date, departure_date
-    ) VALUES (?, ?, ?, ?, ?, ?)
-`);
+// (Requêtes préparées remplacées par la couche db.js asynchrone)
 
 
 function validateDate(value) {
@@ -754,16 +313,16 @@ function normalizeStatusPayload(body, currentRoom) {
 }
 
 
-function roomExportRows() {
+async function roomExportRows() {
 
-    return selectRooms.all();
+    return db.getRooms();
 
 }
 
 
-function historyExportRows(limit = 500) {
+async function historyExportRows(limit = 500) {
 
-    return selectHistory.all(limit);
+    return db.getHistory(limit);
 
 }
 
@@ -784,20 +343,14 @@ function calculateNights(arrivalDate, departureDate) {
 }
 
 
-function loadPaymentsOrdered(limit = 500) {
+async function loadPaymentsOrdered(limit = 500) {
 
-    return db.prepare(`
-        SELECT id, room_number, room_type, client_name, arrival_date, departure_date,
-               nights, price_per_night, amount, kind, note, created_at
-        FROM payments
-        ORDER BY created_at DESC, id DESC
-        LIMIT ?
-    `).all(limit);
+    return db.getPayments(limit);
 
 }
 
 
-function recordStayPayment({ roomNumber, roomType, clientName, arrivalDate, departureDate, pricePerNight, kind, note }) {
+async function recordStayPayment({ roomNumber, roomType, clientName, arrivalDate, departureDate, pricePerNight, kind, note }) {
 
     const nights = calculateNights(arrivalDate, departureDate);
     const price = Number(pricePerNight || 0);
@@ -805,23 +358,18 @@ function recordStayPayment({ roomNumber, roomType, clientName, arrivalDate, depa
 
     if (nights <= 0 || amount <= 0) return null;
 
-    db.prepare(`
-        INSERT INTO payments (
-            room_number, room_type, client_name, arrival_date, departure_date,
-            nights, price_per_night, amount, kind, note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    await db.insertPayment({
         roomNumber,
-        roomType || "",
-        clientName || "",
-        arrivalDate || "",
-        departureDate || "",
+        roomType: roomType || "",
+        clientName: clientName || "",
+        arrivalDate: arrivalDate || "",
+        departureDate: departureDate || "",
         nights,
-        price,
+        pricePerNight: price,
         amount,
-        kind || "Séjour",
-        note || ""
-    );
+        kind: kind || "Séjour",
+        note: note || ""
+    });
 
     return { nights, price, amount };
 
@@ -831,7 +379,7 @@ function recordStayPayment({ roomNumber, roomType, clientName, arrivalDate, depa
 // Enregistre une avance (acompte) dans le journal des paiements.
 // Contrairement a un sejour, on ne l'annule pas si les nuits valent 0 :
 // l'argent reellement recu doit rester trace.
-function recordAdvancePayment({ roomNumber, roomType, clientName, arrivalDate, departureDate, pricePerNight, amount, note }) {
+async function recordAdvancePayment({ roomNumber, roomType, clientName, arrivalDate, departureDate, pricePerNight, amount, note }) {
 
     const paid = Math.round(Number(amount || 0));
 
@@ -840,23 +388,18 @@ function recordAdvancePayment({ roomNumber, roomType, clientName, arrivalDate, d
     const nights = calculateNights(arrivalDate, departureDate);
     const price = Number(pricePerNight || 0);
 
-    db.prepare(`
-        INSERT INTO payments (
-            room_number, room_type, client_name, arrival_date, departure_date,
-            nights, price_per_night, amount, kind, note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    await db.insertPayment({
         roomNumber,
-        roomType || "",
-        clientName || "",
-        arrivalDate || "",
-        departureDate || "",
+        roomType: roomType || "",
+        clientName: clientName || "",
+        arrivalDate: arrivalDate || "",
+        departureDate: departureDate || "",
         nights,
-        price,
-        paid,
-        ADVANCE_PAYMENT_KIND,
-        note || ""
-    );
+        pricePerNight: price,
+        amount: paid,
+        kind: ADVANCE_PAYMENT_KIND,
+        note: note || ""
+    });
 
     return { nights, price, amount: paid };
 
@@ -867,7 +410,7 @@ function recordAdvancePayment({ roomNumber, roomType, clientName, arrivalDate, d
 // "Paiement par avance" (avance), le reste à payer restant calculable
 // comme total - avance. Les deux lignes restent dans le journal des
 // paiements même si la chambre est ensuite libérée.
-function createInvoicePayment({
+async function createInvoicePayment({
     roomNumber,
     roomType,
     clientName,
@@ -905,45 +448,39 @@ function createInvoicePayment({
     const invoiceNote = note ? `Facture — ${note}` : "Facture";
     const advanceNote = note ? `Avance (${note})` : "Paiement par avance";
 
-    db.prepare(`INSERT INTO payments (
-        room_number, room_type, client_name, arrival_date, departure_date,
-        nights, price_per_night, amount, kind, note
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    await db.insertPayment({
         roomNumber,
-        roomType || "",
-        clientName || "",
-        arrivalDate || "",
-        departureDate || "",
+        roomType: roomType || "",
+        clientName: clientName || "",
+        arrivalDate: arrivalDate || "",
+        departureDate: departureDate || "",
         nights,
-        price,
-        totalAmount,
-        "Facture",
-        invoiceNote
-    );
+        pricePerNight: price,
+        amount: totalAmount,
+        kind: "Facture",
+        note: invoiceNote
+    });
 
     let advanceRecord = null;
     if (advanceAmount > 0) {
-        advanceRecord = db.prepare(`INSERT INTO payments (
-            room_number, room_type, client_name, arrival_date, departure_date,
-            nights, price_per_night, amount, kind, note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        advanceRecord = await db.insertPayment({
             roomNumber,
-            roomType || "",
-            clientName || "",
-            arrivalDate || "",
-            departureDate || "",
+            roomType: roomType || "",
+            clientName: clientName || "",
+            arrivalDate: arrivalDate || "",
+            departureDate: departureDate || "",
             nights,
-            price,
-            advanceAmount,
-            ADVANCE_PAYMENT_KIND,
-            advanceNote
-        );
+            pricePerNight: price,
+            amount: advanceAmount,
+            kind: ADVANCE_PAYMENT_KIND,
+            note: advanceNote
+        });
     }
 
     // Report de l'avance sur la chambre : la fiche et le reçu affichent
     // l'avance réellement versée dès la création de la facture.
     if (advanceAmount > 0 && Number(roomNumber) > 0) {
-        reportInvoiceAdvanceToRoom.run(advanceAmount, roomNumber);
+        await db.reportAdvance(roomNumber, advanceAmount);
     }
 
     const created_at = new Date().toISOString();
@@ -984,35 +521,29 @@ function createInvoicePayment({
 
 
 // Historique des avances enregistrees pour une chambre (utilise sur la facture).
-function loadRoomAdvancePayments(roomNumber, limit = 20) {
+async function loadRoomAdvancePayments(roomNumber, limit = 20) {
 
-    return db.prepare(`
-        SELECT id, amount, note, created_at
-        FROM payments
-        WHERE room_number = ? AND kind = ?
-        ORDER BY created_at DESC, id DESC
-        LIMIT ?
-    `).all(roomNumber, ADVANCE_PAYMENT_KIND, limit);
+    return db.getRoomAdvancePayments(roomNumber, limit);
 
 }
 
 
 
 
-function handleExport(res, type) {
+async function handleExport(res, type) {
 
     if (type === "rooms") {
-        const csv = toCsv(roomExportRows(), roomColumns());
+        const csv = toCsv(await roomExportRows(), roomColumns());
         return sendCsv(res, "hotel-belinga-chambres.csv", csv);
     }
 
     if (type === "history") {
-        const csv = toCsv(historyExportRows(), historyColumns());
+        const csv = toCsv(await historyExportRows(), historyColumns());
         return sendCsv(res, "hotel-belinga-historique.csv", csv);
     }
 
     if (type === "payments") {
-        const rows = loadPaymentsOrdered(2000);
+        const rows = await loadPaymentsOrdered(2000);
         const csv = toCsv(rows, [
             { label: "ID", get: row => row.id },
             { label: "Chambre", get: row => row.room_number },
@@ -1073,7 +604,7 @@ async function createInvoiceRoute(req, res) {
 
     let room = null;
     if (roomNumber) {
-        room = selectRoomByNumber.get(roomNumber);
+        room = await db.getRoom(roomNumber);
         if (!room) {
             return sendText(res, 404, "Chambre introuvable : " + roomNumber + ".");
         }
@@ -1086,7 +617,7 @@ async function createInvoiceRoute(req, res) {
     const pricePerNight = room ? room.price : (Number(body?.pricePerNight) || 0);
 
     try {
-        const result = createInvoicePayment({
+        const result = await createInvoicePayment({
             roomNumber,
             roomType,
             clientName,
@@ -1129,7 +660,8 @@ const server = http.createServer(async (req, res) => {
 
         if (req.method === "GET" && pathname === "/api/rooms") {
 
-            return sendJson(res, 200, selectRooms.all().map(attachRoomMetrics));
+            const rooms = await db.getRooms();
+            return sendJson(res, 200, rooms.map(attachRoomMetrics));
 
         }
 
@@ -1137,7 +669,7 @@ const server = http.createServer(async (req, res) => {
         if (req.method === "GET" && pathname === "/api/history") {
 
             const limit = parsePositiveInt(url.searchParams.get("limit"), 100);
-            return sendJson(res, 200, selectHistory.all(limit));
+            return sendJson(res, 200, await db.getHistory(limit));
 
         }
 
@@ -1152,13 +684,13 @@ const server = http.createServer(async (req, res) => {
             }
 
             const limit = parsePositiveInt(url.searchParams.get("limit"), 20);
-            return sendJson(res, 200, selectRoomHistory.all(number, limit));
+            return sendJson(res, 200, await db.getRoomHistory(number, limit));
 
         }
 
 
         if (req.method === "GET" && pathname === "/api/exports/rooms.csv") {
-            return handleExport(res, "rooms");
+            return await handleExport(res, "rooms");
         }
 
 
@@ -1170,7 +702,7 @@ const server = http.createServer(async (req, res) => {
                 return sendText(res, 400, "Numero de chambre invalide.");
             }
 
-            const room = selectRoomByNumber.get(number);
+            const room = await db.getRoom(number);
 
             if (!room) {
                 return sendText(res, 404, "Chambre introuvable.");
@@ -1189,7 +721,7 @@ const server = http.createServer(async (req, res) => {
                 return sendText(res, 400, "Numero de chambre invalide.");
             }
 
-            const room = selectRoomByNumber.get(number);
+            const room = await db.getRoom(number);
 
             if (!room) {
                 return sendText(res, 404, "Chambre introuvable.");
@@ -1200,12 +732,12 @@ const server = http.createServer(async (req, res) => {
             // Avance du reçu = la plus élevée entre l'avance connue de la
             // chambre et la somme des avances versées dans le journal des
             // paiements (chaque facture avec acompte y inscrit une ligne).
-            const journalAdvances = sumRoomAdvances.get(number, ADVANCE_PAYMENT_KIND);
+            const journalAdvances = await db.sumAdvances(number, ADVANCE_PAYMENT_KIND);
             const advance = Math.max(
                 Number(room.advance_payment || 0),
-                Number(journalAdvances?.total || 0)
+                Number(journalAdvances || 0)
             );
-            const history = selectRoomHistory.all(number, 20);
+            const history = await db.getRoomHistory(number, 20);
 
             return sendJson(res, 200, {
                 room,
@@ -1213,7 +745,7 @@ const server = http.createServer(async (req, res) => {
                 total,
                 advance,
                 balance: total - advance,
-                advance_payments: loadRoomAdvancePayments(number, 20),
+                advance_payments: await loadRoomAdvancePayments(number, 20),
                 history,
                 generated_at: new Date().toISOString()
             });
@@ -1221,7 +753,7 @@ const server = http.createServer(async (req, res) => {
 
 
         if (req.method === "GET" && pathname === "/api/exports/history.csv") {
-            return handleExport(res, "history");
+            return await handleExport(res, "history");
         }
 
 
@@ -1229,12 +761,12 @@ const server = http.createServer(async (req, res) => {
         // chambre passe à Libre : chaque séjour / modification y reste tracé).
         if (req.method === "GET" && pathname === "/api/payments") {
             const limit = parsePositiveInt(url.searchParams.get("limit"), 500);
-            return sendJson(res, 200, loadPaymentsOrdered(limit));
+            return sendJson(res, 200, await loadPaymentsOrdered(limit));
         }
 
 
         if (req.method === "GET" && pathname === "/api/exports/payments.csv") {
-            return handleExport(res, "payments");
+            return await handleExport(res, "payments");
         }
 
 
@@ -1250,7 +782,7 @@ const server = http.createServer(async (req, res) => {
         // si l'avance > 0, un "Paiement par avance". Le reste à payer reste
         // toujours calculable côté client via total - avance.
         if (req.method === "POST" && pathname === "/api/payments") {
-            return createInvoiceRoute(req, res);
+            return await createInvoiceRoute(req, res);
         }
 
 
@@ -1262,7 +794,7 @@ const server = http.createServer(async (req, res) => {
                 return sendText(res, 400, "Numero de chambre invalide.");
             }
 
-            const currentRoom = selectRoomByNumber.get(number);
+            const currentRoom = await db.getRoom(number);
 
             if (!currentRoom) {
                 return sendText(res, 404, "Chambre introuvable.");
@@ -1278,16 +810,15 @@ const server = http.createServer(async (req, res) => {
             const { payload, unchanged } = normalized;
 
             if (!unchanged) {
-                updateRoom.run(payload.status, payload.clientName, payload.arrivalDate, payload.departureDate, payload.price, Number(payload.advancePayment || 0), number);
-                checkpointDatabase();
-                insertHistory.run(
-                    number,
-                    currentRoom.status,
-                    payload.status,
-                    payload.clientName,
-                    payload.arrivalDate,
-                    payload.departureDate
-                );
+                await db.updateRoom(number, payload);
+                await db.insertHistory({
+                    roomNumber: number,
+                    previousStatus: currentRoom.status,
+                    newStatus: payload.status,
+                    clientName: payload.clientName,
+                    arrivalDate: payload.arrivalDate,
+                    departureDate: payload.departureDate
+                });
 
                 // --- Paiement par avance : chaque montant saisi ou modifie
                 // est trace dans le journal des paiements (jamais efface). ---
@@ -1295,7 +826,7 @@ const server = http.createServer(async (req, res) => {
                 const nextAdvance = Number(payload.advancePayment || 0);
 
                 if (nextAdvance !== previousAdvance && nextAdvance > 0) {
-                    recordAdvancePayment({
+                    await recordAdvancePayment({
                         roomNumber: number,
                         roomType: currentRoom.type,
                         clientName: payload.clientName || currentRoom.client_name,
@@ -1330,7 +861,7 @@ const server = http.createServer(async (req, res) => {
                         // Note : pour Libre/Nettoyage le payload a dates vides,
                         // on utilise donc les dates du séjour en cours (+ le départ
                         // anticipé déjà enregistré s'il y en a un).
-                        recordStayPayment({
+                        await recordStayPayment({
                             roomNumber: number,
                             roomType: currentRoom.type,
                             clientName: currentRoom.client_name,
@@ -1348,7 +879,7 @@ const server = http.createServer(async (req, res) => {
 
                         if (!wasStay) {
                             // Nouvelle réservation / occupation.
-                            recordStayPayment({
+                            await recordStayPayment({
                                 roomNumber: number,
                                 roomType: currentRoom.type,
                                 clientName: payload.clientName,
@@ -1363,7 +894,7 @@ const server = http.createServer(async (req, res) => {
                             // sans libérer la chambre) : on trace avant/après.
                             const early = payload.departureDate && currentRoom.departure_date &&
                                 payload.departureDate < currentRoom.departure_date;
-                            recordStayPayment({
+                            await recordStayPayment({
                                 roomNumber: number,
                                 roomType: currentRoom.type,
                                 clientName: payload.clientName,
@@ -1376,10 +907,9 @@ const server = http.createServer(async (req, res) => {
                         }
                     }
                 }
-                checkpointDatabase();
             }
 
-            return sendJson(res, 200, selectRoomByNumber.get(number));
+            return sendJson(res, 200, await db.getRoom(number));
 
         }
 
@@ -1441,12 +971,11 @@ server.listen(PORT, "0.0.0.0", () => {
 });
 
 
-// Arrêt propre : on force un checkpoint WAL puis on ferme la base.
-// Sans ça, un Ctrl+C peut laisser les dernières écritures uniquement dans
-// le fichier -wal, et le navigateur semble alors "repartir à zéro".
+// Arrêt propre : la connexion à la base est fermée proprement
+// (checkpoint SQLite / fermeture du pool PostgreSQL).
 let isShuttingDown = false;
 
-function shutdown(signal) {
+async function shutdown(signal) {
 
     if (isShuttingDown) return;
     isShuttingDown = true;
@@ -1454,9 +983,8 @@ function shutdown(signal) {
     console.log(`\n${signal} reçu : sauvegarde de la base et arret du serveur...`);
 
     try {
-        db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
-        db.close();
-        console.log("Base SQLite sauvegardee et fermee proprement.");
+        await db.close();
+        console.log("Base fermee proprement.");
     } catch (error) {
         console.error("Fermeture de la base impossible :", error.message);
     }
@@ -1470,11 +998,3 @@ function shutdown(signal) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-
-process.on("exit", () => {
-    try {
-        db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
-    } catch (error) {
-        // Ignoré : on est déjà en train de quitter.
-    }
-});

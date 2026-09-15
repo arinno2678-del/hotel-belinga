@@ -3,8 +3,11 @@
 // Usage :
 //   node reset.js            -> demande confirmation "OUI"
 //   node reset.js --force    -> reset sans demander
-// Ce script supprime hotel-belinga.sqlite* puis le serveur
-// recree une base neuve (52 chambres Libres) au demarrage.
+// Deux modes :
+//   - DATABASE_URL défini (PostgreSQL : Render / Neon) :
+//     les tables sont vidées directement dans la base distante.
+//   - Sinon (SQLite locale) : suppression des fichiers
+//     hotel-belinga.sqlite* (le serveur recrée la base au démarrage).
 // =====================================================
 
 import { createInterface } from "node:readline/promises";
@@ -42,6 +45,28 @@ if (!force) {
     }
 }
 
+// --- Mode PostgreSQL (Render / Neon) : reset direct dans la base ---
+if (process.env.DATABASE_URL && String(process.env.DATABASE_URL).trim()) {
+    console.log("");
+    console.log("Mode PostgreSQL detecte (DATABASE_URL) : reset dans la base distante...");
+
+    try {
+        const { createStorage } = await import("./db.js");
+        const storage = await createStorage();
+        await storage.init();
+        await storage.resetAll();
+        await storage.close();
+        console.log("");
+        console.log("Base PostgreSQL reinitialisee : 52 chambres Libres,");
+        console.log("historique et journal des paiements vides.");
+        process.exit(0);
+    } catch (error) {
+        console.error("Reset PostgreSQL impossible :", error.message);
+        process.exit(1);
+    }
+}
+
+// --- Mode SQLite local : suppression des fichiers ---
 let deleted = 0;
 
 for (const file of databaseFiles) {

@@ -9,5 +9,11 @@
     "reset": "node reset.js",
     "reset:force": "node reset.js --force",
     "reset:server": "node server.js --reset"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
