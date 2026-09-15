@@ -1,0 +1,19 @@
+# Blueprint Render : quand tu crées le Web Service via "Blueprint",
+# ces réglages sont appliqués automatiquement (plus rien à saisir
+# à part DATABASE_URL, qui te sera demandé une seule fois).
+services:
+  - type: web
+    name: hotel-belinga
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      # Render te demandera de coller la connection string Neon
+      # lors de la création du service (une seule fois).
+      - key: DATABASE_URL
+        sync: false
+      # Node 22 : garantit la compatibilité du mode SQLite local
+      # et de toutes les dépendances sur Render.
+      - key: NODE_VERSION
+        value: 22.11.0
