@@ -1023,6 +1023,72 @@ select {
 }
 
 /* =========================
+   RÉSERVATION PAR TÉLÉPHONE / WHATSAPP
+   (numéro dédié affiché dans la section Réservations)
+========================= */
+.reservation-contact {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.reservation-phone {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+    font-size: 13px;
+    font-weight: 600;
+    color: #172033;
+    white-space: nowrap;
+}
+
+.call-btn,
+.whatsapp-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.call-btn {
+    background: #0f766e;
+}
+
+.call-btn:hover,
+.call-btn:focus-visible {
+    background: #115e59;
+}
+
+.whatsapp-btn {
+    background: #25d366;
+}
+
+.whatsapp-btn:hover,
+.whatsapp-btn:focus-visible {
+    background: #1ebe5b;
+}
+
+.call-btn:active,
+.whatsapp-btn:active {
+    transform: scale(0.98);
+}
+
+/* =========================
    MOBILE
 ========================= */
 
@@ -1180,6 +1246,28 @@ select {
 
     .data-table {
         min-width: 640px;
+    }
+
+    /* Réservation par téléphone : boutons pleine largeur,
+       faciles à toucher, ouverture directe de l'app Téléphone. */
+    .reservation-contact {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .reservation-phone {
+        order: -1;
+        width: 100%;
+        justify-content: center;
+        white-space: normal;
+        text-align: center;
+    }
+
+    .call-btn,
+    .whatsapp-btn {
+        flex: 1 1 100%;
+        min-height: 50px;
+        font-size: 16px;
     }
 
 }
