@@ -5,625 +5,746 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#172033">
 
-    <!-- ================= SEO : page publique ================= -->
-    <title>Hôtel Belinga — Makokou (Gabon) | Chambres &amp; Réservations : +241 07 76 66 920</title>
-    <meta name="description" content="Hôtel Belinga à Makokou, Ogooué-Ivindo (Gabon) : 52 chambres climatisées — VIP, Standard et Suites, de 30 000 à 350 000 FCFA la nuit. Réservez au +241 07 76 66 920.">
-    <link rel="canonical" href="https://hotel-belinga.onrender.com/">
-    <meta name="robots" content="index, follow">
-    <meta name="geo.region" content="GA-06">
-    <meta name="geo.placename" content="Makokou, Ogooué-Ivindo">
-
-    <!-- Réseaux sociaux / partage -->
-    <meta property="og:type" content="website">
-    <meta property="og:locale" content="fr_FR">
-    <meta property="og:site_name" content="Hôtel Belinga">
-    <meta property="og:title" content="Hôtel Belinga — Makokou, Gabon | Réservations +241 07 76 66 920">
-    <meta property="og:description" content="52 chambres climatisées à Makokou (Ogooué-Ivindo) : VIP, Standard et Suites. Réservez par téléphone ou sur WhatsApp.">
-    <meta property="og:url" content="https://hotel-belinga.onrender.com/">
-    <meta property="og:image" content="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&amp;fit=crop&amp;w=1200&amp;q=80">
-    <meta name="twitter:card" content="summary_large_image">
+    <title>Hotel Manager</title>
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css?v=11">
 
-    <style>
-        :root {
-            --navy: #172033;
-            --teal: #0f766e;
-            --teal-dk: #115e59;
-            --gold: #d4a017;
-            --bg: #f6f7f9;
-            --muted: #6b7280;
-            --wa: #25d366;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        html { scroll-behavior: smooth; }
-
-        body {
-            font-family: "Poppins", sans-serif;
-            background: var(--bg);
-            color: var(--navy);
-            line-height: 1.65;
-        }
-
-        img { display: block; max-width: 100%; }
-
-        a { color: inherit; text-decoration: none; }
-
-        .wrap { width: min(1120px, 100% - 40px); margin-inline: auto; }
-
-        /* ---------- Barre de navigation ---------- */
-        .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            background: rgba(23, 32, 51, 0.97);
-            color: #fff;
-        }
-
-        .topbar-inner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            min-height: 62px;
-        }
-
-        .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
-        .brand i { color: var(--gold); }
-
-        .menu { display: flex; gap: 22px; font-size: 14px; font-weight: 500; overflow-x: auto; scrollbar-width: none; }
-        .menu::-webkit-scrollbar { display: none; }
-        .menu a { opacity: .85; padding: 6px 0; white-space: nowrap; }
-        .menu a:hover { opacity: 1; color: #ffd97a; }
-
-        /* ---------- Boutons ---------- */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 9px;
-            padding: 14px 24px;
-            border-radius: 12px;
-            font-family: inherit;
-            font-size: 15px;
-            font-weight: 600;
-            color: #fff;
-            cursor: pointer;
-            border: none;
-            transition: background .15s ease, transform .15s ease;
-        }
-
-        .btn-call { background: var(--teal); }
-        .btn-call:hover { background: var(--teal-dk); }
-        .btn-wa { background: var(--wa); }
-        .btn-wa:hover { background: #1ebe5b; }
-        .btn-ghost { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35); }
-        .btn-ghost:hover { background: rgba(255,255,255,.25); }
-        .btn:active { transform: scale(.98); }
-        /* ---------- Hero ---------- */
-        .hero {
-            position: relative;
-            color: #fff;
-            background:
-                linear-gradient(rgba(15,23,42,.72), rgba(15,23,42,.78)),
-                url("https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80") center/cover no-repeat;
-            padding: 90px 0 80px;
-            text-align: center;
-        }
-
-        .hero .eyebrow {
-            display: inline-block;
-            background: rgba(212,160,23,.95);
-            color: #1a1a1a;
-            font-size: 12.5px;
-            font-weight: 600;
-            letter-spacing: .8px;
-            text-transform: uppercase;
-            padding: 6px 14px;
-            border-radius: 999px;
-            margin-bottom: 18px;
-        }
-
-        .hero h1 { font-size: clamp(32px, 6vw, 54px); line-height: 1.15; font-weight: 700; }
-        .hero h1 span { color: #ffd97a; }
-
-        .hero p.sub { max-width: 640px; margin: 16px auto 0; font-size: clamp(15px, 2.4vw, 18px); opacity: .92; }
-
-        .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
-
-        .hero-facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 26px; margin-top: 38px; font-size: 14px; }
-        .hero-facts div { display: flex; align-items: center; gap: 8px; opacity: .92; }
-        .hero-facts i { color: #ffd97a; }
-
-        /* ---------- Titres de section ---------- */
-        section.block { padding: 68px 0; }
-
-        .head { max-width: 760px; margin-bottom: 34px; }
-        .head.center { margin-inline: auto; text-align: center; }
-
-        .head h2 { font-size: clamp(24px, 4vw, 34px); line-height: 1.25; }
-        .head h2::after {
-            content: "";
-            display: block;
-            width: 58px;
-            height: 4px;
-            border-radius: 4px;
-            background: var(--gold);
-            margin-top: 12px;
-        }
-        .head.center h2::after { margin-inline: auto; }
-        .head p { color: var(--muted); margin-top: 14px; }
-
-        /* ---------- Présentation ---------- */
-        .intro-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 34px; align-items: center; }
-        .intro-grid img { border-radius: 18px; box-shadow: 0 18px 40px rgba(0,0,0,.16); }
-        .intro-list { list-style: none; display: grid; gap: 14px; margin-top: 20px; }
-        .intro-list li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; }
-        .intro-list i { color: var(--teal); margin-top: 5px; }
-
-        /* ---------- Chambres ---------- */
-        .rooms { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
-
-        .room-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 24px 22px;
-            box-shadow: 0 8px 26px rgba(0,0,0,.06);
-            border-top: 4px solid var(--teal);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .room-card .ico { width: 44px; height: 44px; border-radius: 12px; background: #e6f2f1; color: var(--teal); display: flex; align-items: center; justify-content: center; font-size: 18px; }
-        .room-card h3 { font-size: 18px; }
-        .room-card .num { font-size: 13px; color: var(--muted); }
-        .room-card .price { font-size: 21px; font-weight: 700; color: var(--teal); margin-top: 6px; }
-        .room-card .price small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
-        .room-card .note { font-size: 13px; color: var(--muted); }
-        /* ---------- Services ---------- */
-        .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
-
-        .service {
-            background: #fff;
-            border-radius: 16px;
-            padding: 22px;
-            box-shadow: 0 8px 26px rgba(0,0,0,.06);
-            display: flex;
-            gap: 14px;
-            align-items: flex-start;
-        }
-
-        .service i { font-size: 22px; color: var(--gold); margin-top: 3px; }
-        .service h4 { font-size: 15.5px; margin-bottom: 4px; }
-        .service p { font-size: 13.5px; color: var(--muted); }
-
-        /* ---------- Galerie photos ---------- */
-        .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-        .gallery figure { position: relative; overflow: hidden; border-radius: 16px; background: #dfe3e8; }
-        .gallery img { width: 100%; height: 230px; object-fit: cover; transition: transform .4s ease; }
-        .gallery figure:hover img { transform: scale(1.06); }
-        .gallery figcaption {
-            position: absolute;
-            left: 0; right: 0; bottom: 0;
-            padding: 26px 14px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #fff;
-            background: linear-gradient(transparent, rgba(0,0,0,.72));
-        }
-
-        /* ---------- Contact ---------- */
-        .contact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
-
-        .contact-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 26px 22px;
-            text-align: center;
-            box-shadow: 0 8px 26px rgba(0,0,0,.06);
-        }
-
-        .contact-card i { font-size: 26px; color: var(--teal); }
-        .contact-card h3 { font-size: 16px; margin: 12px 0 6px; }
-        .contact-card p { font-size: 14.5px; color: var(--muted); }
-        .contact-card .big { font-size: 19px; font-weight: 700; color: var(--navy); }
-        .contact-card .btn { width: 100%; margin-top: 16px; }
-
-        .cta-band {
-            margin-top: 34px;
-            background: linear-gradient(120deg, var(--navy), #22304d);
-            color: #fff;
-            border-radius: 20px;
-            padding: 38px 30px;
-            text-align: center;
-        }
-        .cta-band h3 { font-size: clamp(20px, 3.5vw, 27px); }
-        .cta-band p { opacity: .85; margin-top: 8px; font-size: 15px; }
-
-        /* ---------- Pied de page ---------- */
-        footer { background: var(--navy); color: rgba(255,255,255,.8); padding: 34px 0 110px; font-size: 13.5px; }
-        .foot { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
-        footer a:hover { color: #ffd97a; }
-
-        /* ---------- Barre d'appel fixe (mobile) ---------- */
-        .callbar {
-            position: fixed;
-            left: 0; right: 0; bottom: 0;
-            z-index: 60;
-            display: flex;
-            gap: 10px;
-            padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
-            background: rgba(23,32,51,.97);
-        }
-        .callbar .btn { flex: 1; min-height: 50px; font-size: 15.5px; padding: 12px; }
-
-        /* ---------- Responsive ---------- */
-        @media (max-width: 900px) {
-            .intro-grid { grid-template-columns: 1fr; }
-            .gallery { grid-template-columns: repeat(2, 1fr); }
-            .menu { display: none; }
-            .hero { padding: 64px 0 58px; }
-            section.block { padding: 50px 0; }
-        }
-
-        @media (max-width: 560px) {
-            .gallery { grid-template-columns: 1fr; }
-            .gallery img { height: 210px; }
-            .hero-actions .btn { width: 100%; }
-            .topbar .btn { display: none; }
-        }
-
-        @media (min-width: 901px) {
-            .callbar { display: none; }
-            footer { padding-bottom: 34px; }
-        }
-    </style>
-
-    <!-- Données structurées Google (fiche hôtel) -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "Hotel",
-        "name": "Hôtel Belinga",
-        "url": "https://hotel-belinga.onrender.com/",
-        "telephone": "+241077666920",
-        "image": "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80",
-        "description": "Hôtel Belinga à Makokou (Ogooué-Ivindo, Gabon) : 52 chambres climatisées — VIP, Standard et Suites, de 30 000 à 350 000 FCFA la nuit.",
-        "priceRange": "30 000 - 350 000 FCFA",
-        "currenciesAccepted": "XAF",
-        "address": {
-            "@type": "PostalAddress",
-            "addressLocality": "Makokou",
-            "addressRegion": "Ogooué-Ivindo",
-            "addressCountry": "GA"
-        },
-        "amenityFeature": [
-            { "@type": "LocationFeatureSpecification", "name": "Chambres climatisées", "value": true },
-            { "@type": "LocationFeatureSpecification", "name": "Wi-Fi", "value": true },
-            { "@type": "LocationFeatureSpecification", "name": "Parking", "value": true },
-            { "@type": "LocationFeatureSpecification", "name": "Réception 24h/24", "value": true }
-        ],
-        "aggregateOffer": {
-            "@type": "AggregateOffer",
-            "lowPrice": 30000,
-            "highPrice": 350000,
-            "priceCurrency": "XAF"
-        }
-    }
-    </script>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
+
 <body>
-    <!-- ================= NAVIGATION ================= -->
-    <header class="topbar">
-        <div class="wrap topbar-inner">
-            <a class="brand" href="#accueil"><i class="fa-solid fa-hotel"></i> HOTEL BELINGA</a>
 
-            <nav class="menu" aria-label="Navigation principale">
-                <a href="#accueil">Accueil</a>
-                <a href="#hotel">L'hôtel</a>
-                <a href="#chambres">Chambres</a>
-                <a href="#services">Services</a>
-                <a href="#photos">Photos</a>
-                <a href="#contact">Contact</a>
-            </nav>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
 
-            <a class="btn btn-call" href="tel:+241077666920" style="padding:10px 18px; font-size:14px;">
-                <i class="fa-solid fa-phone"></i> +241 07 76 66 920
-            </a>
+        <div class="logo">
+            <i class="fa-solid fa-hotel"></i>
+            <span>HOTEL BELINGA</span>
         </div>
-    </header>
 
-    <!-- ================= HERO ================= -->
-    <section class="hero" id="accueil">
-        <div class="wrap">
-            <span class="eyebrow">Makokou · Ogooué-Ivindo · Gabon</span>
+        <nav>
 
-            <h1>Hôtel <span>Belinga</span><br>votre séjour à Makokou</h1>
+            <button class="nav-btn active" type="button" data-view="dashboard">
+                <i class="fa-solid fa-chart-line"></i>
+                Tableau de bord
+            </button>
 
-            <p class="sub">
-                52 chambres climatisées — VIP, Standard et Suites — dans un cadre paisible,
-                aux tarifs de 30 000 à 350 000 FCFA la nuit.
-            </p>
+            <button class="nav-btn" type="button" data-view="rooms">
+                <i class="fa-solid fa-bed"></i>
+                Chambres
+            </button>
 
-            <div class="hero-actions">
-                <a class="btn btn-call" href="tel:+241077666920">
-                    <i class="fa-solid fa-phone"></i> Appeler pour réserver
-                </a>
+            <button class="nav-btn" type="button" data-view="planning">
+                <i class="fa-solid fa-calendar-days"></i>
+                Planning
+            </button>
 
-                <a class="btn btn-wa"
-                   href="https://wa.me/241077666920?text=Bonjour%2C%20je%20souhaite%20r%C3%A9server%20une%20chambre%20%C3%A0%20l%27H%C3%B4tel%20Belinga."
-                   target="_blank" rel="noopener">
-                    <i class="fa-brands fa-whatsapp"></i> Réserver sur WhatsApp
-                </a>
+            <button class="nav-btn" type="button" data-view="clients">
+                <i class="fa-solid fa-users"></i>
+                Clients
+            </button>
 
-                <a class="btn btn-ghost" href="#chambres">
-                    <i class="fa-solid fa-bed"></i> Voir les chambres
-                </a>
-            </div>
+            <button class="nav-btn" type="button" data-view="reservations">
+                <i class="fa-solid fa-bookmark"></i>
+                Réservations
+            </button>
 
-            <div class="hero-facts">
-                <div><i class="fa-solid fa-bed"></i> 52 chambres</div>
-                <div><i class="fa-solid fa-snowflake"></i> Climatisées</div>
-                <div><i class="fa-solid fa-money-bill-wave"></i> 30 000 – 350 000 FCFA / nuit</div>
-                <div><i class="fa-solid fa-location-dot"></i> Makokou, Gabon</div>
-            </div>
+            <button class="nav-btn" type="button" data-view="payments">
+                <i class="fa-solid fa-money-bill-wave"></i>
+                Paiements
+            </button>
+
+            <button class="nav-btn" type="button" data-view="statistics">
+                <i class="fa-solid fa-chart-pie"></i>
+                Statistiques
+            </button>
+
+        </nav>
+
+        <div class="sidebar-footer">
+            <small>© 2026 NHA CREATION</small>
         </div>
-    </section>
 
-    <!-- ================= PRÉSENTATION ================= -->
-    <section class="block" id="hotel">
-        <div class="wrap">
-            <div class="head">
-                <h2>Bienvenue à l'Hôtel Belinga</h2>
-                <p>Une adresse simple et confortable au cœur de Makokou, capitale de la province de l'Ogooué-Ivindo.</p>
+    </aside>
+
+
+    <!-- CONTENU -->
+    <main class="main-content">
+
+        <!-- HEADER -->
+        <header class="header">
+
+            <div>
+                <h1 id="pageTitle">Tableau de bord</h1>
+                <p id="pageDescription">Vue générale et activité en temps réel</p>
             </div>
 
-            <div class="intro-grid">
+            <div class="header-right">
+
+                <div class="date" id="currentDate"></div>
+
+                <div class="sync-badge" id="syncBadge">
+                    Base SQLite connectée
+                </div>
+
+                <button class="profile-btn" id="profileButton" type="button" title="Rafraîchir le tableau">
+                    <i class="fa-solid fa-user"></i>
+                </button>
+
+            </div>
+
+        </header>
+
+        <!-- BANNIÈRE D'ALERTE (serveur injoignable / lecture partielle) -->
+        <div class="alert-banner" id="alertBanner" role="status">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span id="alertBannerText"></span>
+        </div>
+
+
+        <!-- TABLEAU DE BORD -->
+        <section class="app-section active" data-view="dashboard">
+
+            <section class="stats">
+
+                <div class="stat-card total">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-hotel"></i>
+                    </div>
+
+                    <div>
+                        <span>Total Chambres</span>
+                        <h2 id="totalRooms">52</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card available">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-door-open"></i>
+                    </div>
+
+                    <div>
+                        <span>Chambres libres</span>
+                        <h2 id="availableRooms">52</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card occupied">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-bed"></i>
+                    </div>
+
+                    <div>
+                        <span>Chambres occupées</span>
+                        <h2 id="occupiedRooms">0</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card reserved">
+
+                    <div class="stat-icon">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+
+                    <div>
+                        <span>Réservées</span>
+                        <h2 id="reservedRooms">0</h2>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <section class="dashboard-grid">
+
+                <article class="panel-card">
+                    <div class="panel-head">
+                        <div>
+                            <h3>Arrivées à venir</h3>
+                            <p>Chambres avec une date d’arrivée enregistrée.</p>
+                        </div>
+                        <span class="panel-count" id="arrivalsCount">0</span>
+                    </div>
+                    <div id="dashboardArrivals" class="stack-list"></div>
+                </article>
+
+
+                <article class="panel-card">
+                    <div class="panel-head">
+                        <div>
+                            <h3>Départs à venir</h3>
+                            <p>Chambres à libérer prochainement.</p>
+                        </div>
+                        <span class="panel-count" id="departuresCount">0</span>
+                    </div>
+                    <div id="dashboardDepartures" class="stack-list"></div>
+                </article>
+
+
+                <article class="panel-card">
+                    <div class="panel-head">
+                        <div>
+                            <h3>Historique récent</h3>
+                            <p>Derniers changements appliqués à l’hôtel.</p>
+                        </div>
+                        <span class="panel-count" id="historyCount">0</span>
+                    </div>
+                    <div id="dashboardHistory" class="stack-list"></div>
+                </article>
+
+            </section>
+
+        </section>
+
+
+        <!-- CHAMBRES -->
+        <section class="app-section" data-view="rooms">
+
+            <section class="room-actions">
+
+                <div class="search-box">
+
+                    <i class="fa-solid fa-magnifying-glass"></i>
+
+                    <input
+                        type="text"
+                        id="searchRoom"
+                        placeholder="Rechercher une chambre, un client..."
+                    >
+
+                </div>
+
+
+                <select id="filterType">
+
+                    <option value="all">Toutes les chambres</option>
+
+                    <option value="Suite">Suites (toutes)</option>
+
+                    <option value="Suite Junior">Suite Junior</option>
+
+                    <option value="Suite Ministérielle">Suite Ministérielle</option>
+
+                    <option value="Suite Nuptiale">Suite Nuptiale</option>
+
+                    <option value="VIP">VIP (01 → 14)</option>
+
+                    <option value="Standard">Standard</option>
+
+                </select>
+
+
+                <select id="filterStatus">
+
+                    <option value="all">Tous les statuts</option>
+
+                    <option value="Libre">Libre</option>
+
+                    <option value="Occupée">Occupée</option>
+
+                    <option value="Réservée">Réservée</option>
+
+                    <option value="Nettoyage">Nettoyage</option>
+
+                </select>
+
+
+                <button class="refresh-btn" id="refreshRooms" type="button">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    Actualiser
+                </button>
+
+
+                <button class="refresh-btn export-btn" id="exportRoomsCsv" type="button">
+                    <i class="fa-solid fa-file-csv"></i>
+                    Export chambres CSV
+                </button>
+
+
+                <button class="refresh-btn export-btn" id="exportHistoryCsv" type="button">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Export historique CSV
+                </button>
+
+            </section>
+
+
+            <section class="rooms-header">
+
                 <div>
-                    <p>
-                        L'Hôtel Belinga accueille voyageurs, familles et professionnels à Makokou.
-                        Ses <strong>52 chambres numérotées de 01 à 52</strong> sont climatisées et
-                        réparties en trois gammes — <strong>Standard</strong>, <strong>VIP</strong> et
-                        <strong>Suites</strong> — pour répondre à tous les budgets.
-                    </p>
 
-                    <p style="margin-top:14px;">
-                        Que vous soyez de passage pour le travail, un séjour professionnel ou des
-                        vacances en forêt équatoriale, vous y trouverez le calme, le confort et une
-                        équipe disponible pour votre réservation.
-                    </p>
+                    <h2>Les 52 chambres</h2>
 
-                    <ul class="intro-list">
-                        <li><i class="fa-solid fa-circle-check"></i> <span>52 chambres climatisées, du standard à la suite</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i> <span>Réservation directe par téléphone ou WhatsApp, 7 j/7</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i> <span>Tarifs clairs : de 30 000 à 350 000 FCFA la nuit</span></li>
-                        <li><i class="fa-solid fa-circle-check"></i> <span>À Makokou, à deux pas des grands axes de l'Ogooué-Ivindo</span></li>
-                    </ul>
+                    <p>Numérotation de 01 à 52 avec suivi des clients et des réservations.</p>
+
                 </div>
 
-                <img src="https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=900&q=80"
-                     alt="Chambre climatisée de l'Hôtel Belinga à Makokou" loading="lazy">
+                <div class="legend">
+
+                    <span class="legend-item">
+                        <span class="dot available-dot"></span>
+                        Libre
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="dot occupied-dot"></span>
+                        Occupée
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="dot reserved-dot"></span>
+                        Réservée
+                    </span>
+
+                    <span class="legend-item">
+                        <span class="dot cleaning-dot"></span>
+                        Nettoyage
+                    </span>
+
+                </div>
+
+            </section>
+
+
+            <section class="rooms-grid" id="roomsGrid">
+                <!-- Généré automatiquement avec JavaScript -->
+            </section>
+
+        </section>
+
+
+        <!-- PLANNING -->
+        <section class="app-section" data-view="planning">
+
+            <section class="section-title">
+                <div>
+                    <h2>Planning</h2>
+                    <p>Vue d’ensemble des arrivées et départs programmés.</p>
+                </div>
+            </section>
+
+            <div id="planningList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- CLIENTS -->
+        <section class="app-section" data-view="clients">
+
+            <section class="section-title">
+                <div>
+                    <h2>Clients</h2>
+                    <p>Clients actuellement associés aux chambres occupées ou réservées.</p>
+                </div>
+            </section>
+
+            <div id="clientsList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- RÉSERVATIONS -->
+        <section class="app-section" data-view="reservations">
+
+            <section class="section-title">
+                <div>
+                    <h2>Réservations</h2>
+                    <p>Chambres occupées et réservées avec les informations client.</p>
+                </div>
+
+                <div class="reservation-contact">
+                    <span class="reservation-phone">
+                        <i class="fa-solid fa-phone"></i>
+                        Réservations : +241 07 76 66 920
+                    </span>
+
+                    <a class="call-btn" href="tel:+241077666920" title="Appeler l'hôtel pour réserver">
+                        <i class="fa-solid fa-phone"></i>
+                        Appeler pour réserver
+                    </a>
+
+                    <a class="whatsapp-btn"
+                       href="https://wa.me/241077666920?text=Bonjour%2C%20je%20souhaite%20r%C3%A9server%20une%20chambre%20%C3%A0%20l%27H%C3%B4tel%20Belinga."
+                       target="_blank"
+                       rel="noopener"
+                       title="Réserver sur WhatsApp">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        Réserver sur WhatsApp
+                    </a>
+                </div>
+            </section>
+
+            <div id="reservationsList" class="table-section"></div>
+
+        </section>
+
+
+        <!-- PAIEMENTS -->
+        <section class="app-section" data-view="payments">
+
+            <section class="section-title">
+                <div>
+                    <h2>Paiements</h2>
+                    <p>Estimation en cours + journal enregistré (verrouillé : reset complet uniquement).</p>
+                </div>
+
+                <div class="room-actions">
+                    <div class="highlight-metric">
+                        <span>Total estimé (en cours)</span>
+                        <strong id="paymentsTotal">0 FCFA</strong>
+                    </div>
+
+                    <button class="export-btn" id="exportPaymentsCsv" type="button">
+                        <i class="fa-solid fa-file-csv"></i>
+                        Exporter paiements CSV
+                    </button>
+                </div>
+            </section>
+
+            <section class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h3>Séjours en cours — estimation</h3>
+                        <p>Calculée depuis les chambres Occupées / Réservées.</p>
+                    </div>
+                </div>
+
+                <div id="paymentsList" class="table-section"></div>
+
+            </section>
+
+            <section class="panel">
+
+                <div class="panel-head">
+                    <div>
+                        <h3>Journal des paiements enregistrés</h3>
+                        <p>Réservations, modifications, départs anticipés et check-out. Verrouillé : s'efface uniquement avec le reset complet (npm run reset).</p>
+                    </div>
+                    <span class="panel-count" id="paymentsHistoryCount">0</span>
+                </div>
+
+                <div id="paymentsHistoryList" class="table-section"></div>
+
+            </section>
+
+        </section>
+
+
+        <!-- STATISTIQUES -->
+        <section class="app-section" data-view="statistics">
+
+            <section class="section-title">
+                <div>
+                    <h2>Statistiques</h2>
+                    <p>Suivi global, exports et historique des changements.</p>
+                </div>
+            </section>
+
+            <section class="stats-mini-grid">
+
+                <article class="mini-card">
+                    <span>Taux d’occupation</span>
+                    <h3 id="occupancyRate">0%</h3>
+                    <p>Chambres occupées et réservées par rapport au total.</p>
+                </article>
+
+                <article class="mini-card">
+                    <span>Clients actifs</span>
+                    <h3 id="activeClients">0</h3>
+                    <p>Noms de clients enregistrés sur les chambres en cours.</p>
+                </article>
+
+                <article class="mini-card">
+                    <span>Réservations actives</span>
+                    <h3 id="activeReservations">0</h3>
+                    <p>Chambres actuellement occupées ou réservées.</p>
+                </article>
+
+                <article class="mini-card">
+                    <span>Départs à venir</span>
+                    <h3 id="upcomingDepartures">0</h3>
+                    <p>Chambres dont la date de départ est planifiée.</p>
+                </article>
+
+            </section>
+
+
+            <div id="statisticsHistory" class="table-section"></div>
+
+        </section>
+
+    </main>
+
+
+    <!-- MODAL CHAMBRE -->
+    <div class="modal" id="roomModal">
+
+        <div class="modal-content modal-content-wide">
+
+            <button class="close-modal" id="closeModal" type="button">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="modal-header">
+
+                <div class="modal-room-icon">
+                    <i class="fa-solid fa-bed"></i>
+                </div>
+
+                <div>
+
+                    <h2 id="modalRoomNumber">
+                        Chambre
+                    </h2>
+
+                    <p id="modalRoomType">
+                        Standard
+                    </p>
+
+                </div>
+
             </div>
-        </div>
-    </section>
-    <!-- ================= CHAMBRES & TARIFS ================= -->
-    <section class="block" id="chambres" style="background:#eef1f4;">
-        <div class="wrap">
-            <div class="head center">
-                <h2>Nos chambres &amp; tarifs</h2>
-                <p>52 chambres réparties en 5 catégories. Les disponibilités du jour sont confirmées par téléphone.</p>
-            </div>
 
-            <!-- Tarifs statiques (identiques à la grille interne de l'hôtel).
-                 Aucune donnée de réservation n'est affichée publiquement. -->
-            <div class="rooms">
 
-                <article class="room-card">
-                    <div class="ico"><i class="fa-solid fa-bed"></i></div>
-                    <h3>Standard</h3>
-                    <span class="num">Chambres 15 à 49</span>
-                    <div class="price">30 000 – 45 000 FCFA <small>par nuit</small></div>
-                    <p class="note">Le meilleur rapport qualité-prix pour un séjour à Makokou.</p>
-                </article>
+            <div class="modal-grid">
 
-                <article class="room-card">
-                    <div class="ico"><i class="fa-solid fa-star"></i></div>
-                    <h3>VIP</h3>
-                    <span class="num">Chambres 01 à 14</span>
-                    <div class="price">50 000 – 70 000 FCFA <small>par nuit</small></div>
-                    <p class="note">Confort supérieur, idéal pour les séjours professionnels.</p>
-                </article>
+                <div class="modal-panel">
 
-                <article class="room-card">
-                    <div class="ico"><i class="fa-solid fa-couch"></i></div>
-                    <h3>Suite Junior</h3>
-                    <span class="num">Chambre 50</span>
-                    <div class="price">150 000 – 200 000 FCFA <small>par nuit</small></div>
-                    <p class="note">Un espace plus spacieux pour un séjour prolongé.</p>
-                </article>
+                    <div class="modal-info">
 
-                <article class="room-card">
-                    <div class="ico"><i class="fa-solid fa-building-columns"></i></div>
-                    <h3>Suite Ministérielle</h3>
-                    <span class="num">Chambre 51</span>
-                    <div class="price">250 000 – 300 000 FCFA <small>par nuit</small></div>
-                    <p class="note">La suite d'honneur pour vos réceptions et délégations.</p>
-                </article>
+                        <div class="info-row">
+                            <span>Statut</span>
+                            <strong id="modalStatus">Libre</strong>
+                        </div>
 
-                <article class="room-card">
-                    <div class="ico"><i class="fa-solid fa-heart"></i></div>
-                    <h3>Suite Nuptiale</h3>
-                    <span class="num">Chambre 52</span>
-                    <div class="price">350 000 FCFA <small>par nuit</small></div>
-                    <p class="note">Notre plus belle suite, pour les occasions spéciales.</p>
-                </article>
 
-            </div>
+                        <div class="info-row">
+                            <span>Prix / nuit</span>
+                            <strong id="modalPrice">0 FCFA</strong>
+                        </div>
 
-            <div class="cta-band">
-                <h3>Une chambre libre ce soir ?</h3>
-                <p>Appelez-nous : la réception vous confirme la disponibilité en quelques secondes.</p>
-                <div class="hero-actions">
-                    <a class="btn btn-call" href="tel:+241077666920"><i class="fa-solid fa-phone"></i> +241 07 76 66 920</a>
-                    <a class="btn btn-wa" href="https://wa.me/241077666920" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
+
+                        <div class="info-row price-row">
+                            <span>Choisir le tarif</span>
+                            <select id="modalPriceSelect"></select>
+                        </div>
+
+
+                        <div class="info-row">
+                            <span>Dernière modification</span>
+                            <strong id="modalUpdatedAt">-</strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="room-fields">
+
+                        <label for="modalClientName">Nom du client</label>
+                        <input
+                            type="text"
+                            id="modalClientName"
+                            placeholder="Nom complet du client"
+                        >
+
+                        <div class="room-fields-inline">
+
+                            <div>
+                                <label for="modalArrivalDate">Date d’arrivée</label>
+                                <input type="date" id="modalArrivalDate">
+                            </div>
+
+                            <div>
+                                <label for="modalDepartureDate">Date de départ</label>
+                                <input type="date" id="modalDepartureDate">
+                            </div>
+
+                        </div>
+
+                        <label for="modalAdvancePayment">Paiement par avance (FCFA)</label>
+                        <input
+                            type="number"
+                            id="modalAdvancePayment"
+                            min="0"
+                            step="500"
+                            inputmode="numeric"
+                            placeholder="Montant déjà versé (0 si aucun)"
+                        >
+
+                        <p class="advance-preview" id="modalAdvancePreview"></p>
+
+                        <p class="modal-helper" id="modalHelperText">
+                            Pour un départ anticipé : avancez la date de départ et/ou
+                            changez le tarif, puis cliquez « Enregistrer les modifications ».
+                        </p>
+
+                        <label for="modalReceptionist">Nom du réceptionniste (signature facture)</label>
+                        <input
+                            type="text"
+                            id="modalReceptionist"
+                            placeholder="Nom du réceptionniste"
+                            autocomplete="name"
+                        >
+
+                        <button class="save-changes-btn" id="saveRoomChangesBtn" type="button">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            Enregistrer les modifications (dates / prix)
+                        </button>
+
+                        <button class="early-checkout-btn" id="earlyCheckoutBtn" type="button">
+                            <i class="fa-solid fa-person-walking-arrow-left"></i>
+                            Départ anticipé : partir aujourd'hui
+                        </button>
+
+                    </div>
+
+
+            <div class="modal-actions">
+                        <button class="modal-action-btn csv-btn" id="exportSingleRoomCsv" type="button">
+                            <i class="fa-solid fa-file-csv"></i>
+                            Exporter CSV chambre
+                        </button>
+                        <button class="modal-action-btn receipt-btn" id="printReceiptBtn" type="button">
+                            <i class="fa-solid fa-print"></i>
+                            Imprimer reçu PDF
+                        </button>
+                        <button class="modal-action-btn invoice-btn" id="invoiceBtn" type="button">
+                            <i class="fa-solid fa-file-invoice"></i>
+                            Facture
+                        </button>
+                    </div>
+
+                    <div class="status-buttons">
+
+                        <button class="status-btn free-btn" data-status="Libre" type="button">
+                            🟢 Libre
+                        </button>
+
+                        <button class="status-btn occupied-btn" data-status="Occupée" type="button">
+                            🔴 Occupée
+                        </button>
+
+                        <button class="status-btn reserved-btn" data-status="Réservée" type="button">
+                            🟠 Réservée
+                        </button>
+
+                        <button class="status-btn cleaning-btn" data-status="Nettoyage" type="button">
+                            🔵 Nettoyage
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-panel">
+
+                    <div class="panel-head">
+                        <div>
+                            <h3>Historique de la chambre</h3>
+                            <p>Derniers changements enregistrés.</p>
+                        </div>
+                        <span class="panel-count" id="modalHistoryCount">0</span>
+                    </div>
+
+                    <div id="modalHistoryList" class="history-list"></div>
+
+                </div>
+
+            <div class="modal-panel invoice-panel" id="invoicePanel" hidden>
+                <div class="panel-head">
+                    <div>
+                        <h3>Facture — paiement par avance</h3>
+                        <p>Crée une facture avec un montant total, un acompte versé et le reste à payer.</p>
+                    </div>
+                    <button class="panel-close" id="invoiceCloseBtn" type="button" title="Fermer la facture" aria-label="Fermer la facture">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="invoice-fields">
+
+                    <label for="invoiceTotal">Montant total de la facture (FCFA)</label>
+                    <input
+                        type="number"
+                        id="invoiceTotal"
+                        min="1"
+                        step="1000"
+                        inputmode="numeric"
+                        placeholder="Ex : 300000"
+                    >
+
+                    <label for="invoiceAdvance">Avance versée (FCFA)</label>
+                    <input
+                        type="number"
+                        id="invoiceAdvance"
+                        min="0"
+                        step="1000"
+                        inputmode="numeric"
+                        placeholder="0 si aucun acompte"
+                    >
+
+                    <label for="invoiceReceptionist">Réceptionniste (signature)</label>
+                    <input
+                        type="text"
+                        id="invoiceReceptionist"
+                        placeholder="Nom du réceptionniste"
+                        autocomplete="name"
+                    >
+
+                    <label for="invoiceNote">Note (facultatif)</label>
+                    <textarea
+                        id="invoiceNote"
+                        rows="2"
+                        placeholder="Ex : Séjour du 01/10 au 03/10"
+                    ></textarea>
+
+                    <div class="invoice-summary" id="invoiceSummary" hidden>
+                        <div class="invoice-summary-row">
+                            <span>Total facture</span>
+                            <strong id="invoiceTotalDisplay"></strong>
+                        </div>
+                        <div class="invoice-summary-row">
+                            <span>Avance versée</span>
+                            <strong id="invoiceAdvanceDisplay"></strong>
+                        </div>
+                        <div class="invoice-summary-row balance-row">
+                            <span>Reste à payer</span>
+                            <strong id="invoiceBalanceDisplay"></strong>
+                        </div>
+                    </div>
+
+                    <p class="invoice-helper" id="invoiceHelper"></p>
+
+                    <button class="invoice-create-btn" id="invoiceCreateBtn" type="button">
+                        <i class="fa-solid fa-check"></i>
+                        Créer la facture
+                    </button>
+
                 </div>
             </div>
+            </div>
+
         </div>
-    </section>
 
-    <!-- ================= SERVICES ================= -->
-    <section class="block" id="services">
-        <div class="wrap">
-            <div class="head center">
-                <h2>Nos services</h2>
-                <p>Tout le nécessaire pour un séjour confortable à Makokou.</p>
-            </div>
-
-            <div class="services">
-                <article class="service">
-                    <i class="fa-solid fa-snowflake"></i>
-                    <div><h4>Chambres climatisées</h4><p>Confort garanti, même en pleine saison chaude.</p></div>
-                </article>
-
-                <article class="service">
-                    <i class="fa-solid fa-phone-volume"></i>
-                    <div><h4>Réservation 7 j/7</h4><p>Par téléphone ou WhatsApp, réponse immédiate.</p></div>
-                </article>
-
-                <article class="service">
-                    <i class="fa-solid fa-wifi"></i>
-                    <div><h4>Wi-Fi</h4><p>Connecté pendant tout votre séjour.</p></div>
-                </article>
-
-                <article class="service">
-                    <i class="fa-solid fa-square-parking"></i>
-                    <div><h4>Parking</h4><p>Stationnement à proximité de l'hôtel.</p></div>
-                </article>
-
-                <article class="service">
-                    <i class="fa-solid fa-shield-halved"></i>
-                    <div><h4>Sécurité</h4><p>Surveillance et accès contrôlé, jour et nuit.</p></div>
-                </article>
-
-                <article class="service">
-                    <i class="fa-solid fa-broom"></i>
-                    <div><h4>Entretien des chambres</h4><p>Chambres préparées avant chaque arrivée.</p></div>
-                </article>
-            </div>
-        </div>
-    </section>
-    <!-- ================= PHOTOS =================
-         Placeholders (Unsplash) : remplacez ces URL par vos propres photos
-         déposées dans le dossier /images du projet (ex: images/facade.jpg). -->
-    <section class="block" id="photos" style="background:#eef1f4;">
-        <div class="wrap">
-            <div class="head center">
-                <h2>Photos de l'hôtel</h2>
-                <p>Découvrez l'ambiance de l'Hôtel Belinga avant votre arrivée.</p>
-            </div>
-
-            <div class="gallery">
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80"
-                         alt="Façade de l'Hôtel Belinga à Makokou" loading="lazy">
-                    <figcaption>Façade de l'hôtel</figcaption>
-                </figure>
-
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=800&q=80"
-                         alt="Chambre climatisée avec lit double" loading="lazy">
-                    <figcaption>Chambre climatisée</figcaption>
-                </figure>
-
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=800&q=80"
-                         alt="Suite de l'Hôtel Belinga" loading="lazy">
-                    <figcaption>Nos Suites</figcaption>
-                </figure>
-
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=800&q=80"
-                         alt="Lit confortable d'une chambre VIP" loading="lazy">
-                    <figcaption>Chambre VIP</figcaption>
-                </figure>
-
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=800&q=80"
-                         alt="Réception de l'Hôtel Belinga" loading="lazy">
-                    <figcaption>Réception</figcaption>
-                </figure>
-
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&w=800&q=80"
-                         alt="Espace détente de l'Hôtel Belinga" loading="lazy">
-                    <figcaption>Espace détente</figcaption>
-                </figure>
-            </div>
-        </div>
-    </section>
-
-    <!-- ================= CONTACT & RÉSERVATION ================= -->
-    <section class="block" id="contact">
-        <div class="wrap">
-            <div class="head center">
-                <h2>Contact &amp; réservation</h2>
-                <p>Un seul numéro pour tout : réservez votre chambre dès maintenant.</p>
-            </div>
-
-            <div class="contact-grid">
-
-                <article class="contact-card">
-                    <i class="fa-solid fa-phone"></i>
-                    <h3>Réservations par téléphone</h3>
-                    <p class="big"><a href="tel:+241077666920">+241 07 76 66 920</a></p>
-                    <a class="btn btn-call" href="tel:+241077666920">
-                        <i class="fa-solid fa-phone"></i> Appeler maintenant
-                    </a>
-                </article>
-
-                <article class="contact-card">
-                    <i class="fa-brands fa-whatsapp"></i>
-                    <h3>WhatsApp</h3>
-                    <p>Écrivez-nous, nous répondons rapidement.</p>
-                    <a class="btn btn-wa" href="https://wa.me/241077666920" target="_blank" rel="noopener">
-                        <i class="fa-brands fa-whatsapp"></i> Ouvrir WhatsApp
-                    </a>
-                </article>
-
-                <article class="contact-card">
-                    <i class="fa-solid fa-location-dot"></i>
-                    <h3>Adresse</h3>
-                    <p>Makokou<br>Ogooué-Ivindo — Gabon</p>
-                </article>
-
-            </div>
-        </div>
-    </section>
-
-    <!-- ================= PIED DE PAGE ================= -->
-    <footer>
-        <div class="wrap foot">
-            <span><i class="fa-solid fa-hotel" style="color:#d4a017;"></i> <strong>HOTEL BELINGA</strong> — Makokou, Ogooué-Ivindo, Gabon</span>
-            <span>Réservations : <a href="tel:+241077666920"><strong>+241 07 76 66 920</strong></a></span>
-            <span>© 2026 NHA CREATION</span>
-        </div>
-    </footer>
-
-    <!-- Barre d'action fixe sur mobile : appel / WhatsApp toujours à portée de pouce -->
-    <div class="callbar">
-        <a class="btn btn-call" href="tel:+241077666920"><i class="fa-solid fa-phone"></i> Appeler</a>
-        <a class="btn btn-wa" href="https://wa.me/241077666920" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>
     </div>
 
 
+    <script src="script.js?v=20"></script>
 
 </body>
 </html>
