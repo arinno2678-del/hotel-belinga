@@ -44,3 +44,37 @@ Avec PostgreSQL hébergé chez Neon (gratuit), les données vivent chez Neon et
   d'environnement Render (jamais dans le code ni dans le repo).
 - Les données locales SQLite ne sont pas copiées automatiquement vers Neon :
   au premier déploiement, la base distante démarre vierge (52 chambres).
+
+## 6. Accès personnel — `/login` (authentification)
+
+Le site a deux parties :
+
+| URL | Accès | Contenu |
+|---|---|---|
+| `/` | **public** | Vitrine : présentation, tarifs, **disponibilités** (`/api/public/rooms` — aucun nom de client) |
+| `/login` | public | Formulaire du personnel |
+| `/admin` | **session requise** | Tableau de bord (Chambres, Planning, Clients, Réservations, Paiements, Statistiques, Historique) |
+| `/api/history`, `/api/payments`, `/api/rooms`, exports, reçus, écritures | **session requise** | Renvoient `401` sans connexion |
+
+### Paramétrage du mot de passe (obligatoire)
+
+Le dépôt GitHub étant **public**, le mot de passe n'est écrit nulle part dans
+le code : il est lu dans la variable d'environnement `ADMIN_PASSWORD`.
+
+1. https://render.com → votre service **hotel-belinga** → onglet **Environment**
+2. Ajouter :
+   - Clé : `ADMIN_PASSWORD` — Valeur : **le mot de passe choisi** (ex. 12 caractères min.)
+   - Clé : `ADMIN_USERNAME` — Valeur : `hoteladmin` (optionnel, c'est la valeur par défaut)
+3. **Save** (Render redéploie automatiquement)
+4. Ouvrir `https://hotel-belinga.onrender.com/login` et se connecter.
+
+Sans cette variable, **toute tentative de connexion est refusée** (c'est le
+comportement sûr) et Render affiche dans les logs :
+`[AUTH] ADMIN_PASSWORD n'est pas defini…`
+
+### Comportement des sessions
+
+- Cookie `hb_session` (HttpOnly, SameSite=Lax, Secure sur HTTPS), durée **8 h**.
+- Un redémarrage/redéploiement Render déconnecte tout le monde (sessions en mémoire).
+- Bouton **Déconnexion** dans l'en-tête du tableau de bord.
+- Si la session expire pendant l'utilisation : retour automatique sur `/login`.

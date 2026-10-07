@@ -13,6 +13,12 @@ services:
       # lors de la création du service (une seule fois).
       - key: DATABASE_URL
         sync: false
+      # Accès personnel (/login) : Utilisateur + mot de passe du staff.
+      # JAMAIS dans le code — le dépôt GitHub est public.
+      - key: ADMIN_USERNAME
+        value: hoteladmin
+      - key: ADMIN_PASSWORD
+        sync: false
       # Node 22 : garantit la compatibilité du mode SQLite local
       # et de toutes les dépendances sur Render.
       - key: NODE_VERSION
