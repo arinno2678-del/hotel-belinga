@@ -109,6 +109,12 @@ function getContentType(filePath) {
             return "font/woff";
         case ".woff2":
             return "font/woff2";
+        case ".txt":
+            // robots.txt
+            return "text/plain; charset=utf-8";
+        case ".xml":
+            // sitemap.xml
+            return "application/xml; charset=utf-8";
         default:
             return "application/octet-stream";
     }
@@ -141,7 +147,12 @@ async function readJsonBody(req) {
 
 function resolveStaticFile(requestPath) {
 
-    const safePath = requestPath === "/" ? "/index.html" : requestPath;
+    // La racine "/" sert la VITRINE PUBLIQUE (index.html) destinée à Google.
+    // L'application de gestion (tableau de bord) est sur /admin (non indexée).
+    const safePath = (requestPath === "/admin" || requestPath === "/admin/")
+        ? "/admin.html"
+        : (requestPath === "/" ? "/index.html" : requestPath);
+
     const resolvedPath = path.resolve(publicDir, `.${safePath}`);
     const relativePath = path.relative(publicDir, resolvedPath);
 
