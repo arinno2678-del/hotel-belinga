@@ -960,18 +960,6 @@ const server = http.createServer(async (req, res) => {
         }
 
 
-        // /admin/ (avec slash) : on redirige vers /admin, sinon les URL
-        // relatives (script.js, style.css) seraient résolues dans /admin/.
-        if ((req.method === "GET" || req.method === "HEAD") && pathname === "/admin/") {
-            res.writeHead(302, {
-                Location: "/admin",
-                "Cache-Control": "no-store"
-            });
-
-            return res.end();
-        }
-
-
         const filePath = resolveStaticFile(pathname);
 
         if (!filePath) {
