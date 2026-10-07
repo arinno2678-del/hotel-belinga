@@ -248,6 +248,58 @@
         .cta-band h3 { font-size: clamp(20px, 3.5vw, 27px); }
         .cta-band p { opacity: .85; margin-top: 8px; font-size: 15px; }
 
+        /* ---------- Disponibilités (API publique, sans donnée client) ---------- */
+        .dispo-summary {
+            text-align: center;
+            font-size: 15.5px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: var(--muted);
+        }
+
+        .dispo-summary strong { color: var(--teal); font-size: 24px; }
+
+        .dispo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+            gap: 10px;
+        }
+
+        .dispo-room {
+            background: #fff;
+            border-radius: 10px;
+            padding: 11px 6px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--navy);
+            box-shadow: 0 6px 18px rgba(0,0,0,.06);
+            border-left: 4px solid #94a3b8;
+        }
+
+        .dispo-room.free { border-left-color: #16a34a; background: #f0fdf4; }
+        .dispo-room.reserved { border-left-color: #f59e0b; background: #fffbeb; }
+        .dispo-room.busy { border-left-color: #dc2626; background: #fef2f2; }
+
+        .dispo-room small {
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .dispo-note {
+            text-align: center;
+            margin-top: 22px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .dispo-note a { color: var(--teal); font-weight: 600; }
+
+        .dispo-error { grid-column: 1 / -1; text-align: center; color: #b91c1c; font-size: 14.5px; }
+
         /* ---------- Pied de page ---------- */
         footer { background: var(--navy); color: rgba(255,255,255,.8); padding: 34px 0 110px; font-size: 13.5px; }
         .foot { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
@@ -479,6 +531,28 @@
         </div>
     </section>
 
+    <!-- ================= DISPONIBILITÉS EN TEMPS RÉEL ================= -->
+    <!-- Source : GET /api/public/rooms — uniquement numéro / type /
+         prix / statut. Aucun nom de client, aucune date de séjour. -->
+    <section class="block" id="disponibilites">
+        <div class="wrap">
+            <div class="head center">
+                <h2>Chambres disponibles</h2>
+                <p>Disponibilités du jour, mises à jour automatiquement. Seul le statut est public — jamais les informations de nos clients.</p>
+            </div>
+
+            <div class="dispo-summary" id="dispoSummary">Chargement des disponibilités…</div>
+            <div class="dispo-grid" id="dispoGrid" aria-live="polite"></div>
+
+            <p class="dispo-note">
+                Une chambre vous intéresse ? Réservez au
+                <a href="tel:+241077666920">+241 07 76 66 920</a>
+                ou sur
+                <a href="https://wa.me/241077666920" target="_blank" rel="noopener">WhatsApp</a>.
+            </p>
+        </div>
+    </section>
+
     <!-- ================= SERVICES ================= -->
     <section class="block" id="services">
         <div class="wrap">
@@ -613,6 +687,7 @@
         <div class="wrap foot">
             <span><i class="fa-solid fa-hotel" style="color:#d4a017;"></i> <strong>HOTEL BELINGA</strong> — Makokou, Ogooué-Ivindo, Gabon</span>
             <span>Réservations : <a href="tel:+241077666920"><strong>+241 07 76 66 920</strong></a></span>
+            <span><a href="/login" title="Accès réservé au personnel">Espace personnel 🔒</a></span>
             <span>© 2026 NHA CREATION</span>
         </div>
     </footer>
@@ -624,6 +699,55 @@
     </div>
 
 
+
+    <script>
+        // Disponibilités publiques : GET /api/public/rooms
+        // (n°, type, prix, statut — aucune donnée personnelle).
+        (async () => {
+
+            const summary = document.getElementById("dispoSummary");
+            const grid = document.getElementById("dispoGrid");
+
+            try {
+                const response = await fetch("/api/public/rooms", { cache: "no-store" });
+
+                if (!response.ok) throw new Error("indisponible");
+
+                const rooms = await response.json();
+                const freeRooms = rooms.filter(room => room.status === "Libre");
+
+                summary.innerHTML =
+                    "<strong>" + freeRooms.length + "</strong> chambre(s) libre(s) sur " +
+                    rooms.length + " — actualisé automatiquement.";
+
+                const statusClass = {
+                    "Libre": "free",
+                    "Réservée": "reserved",
+                    "Occupée": "busy",
+                    "Nettoyage": "busy"
+                };
+
+                grid.innerHTML = rooms.map(room => {
+                    const number = String(room.number).padStart(2, "0");
+                    const cssClass = statusClass[room.status] || "";
+
+                    return (
+                        '<div class="dispo-room ' + cssClass + '">' +
+                            number +
+                            "<small>" + room.status + "</small>" +
+                        "</div>"
+                    );
+                }).join("");
+
+            } catch {
+                summary.textContent = "";
+                grid.innerHTML =
+                    '<p class="dispo-error">Disponibilités momentanément indisponibles — ' +
+                    'appelez le <a href="tel:+241077666920" style="color:#0f766e;font-weight:600;">+241 07 76 66 920</a>.</p>';
+            }
+
+        })();
+    </script>
 
 </body>
 </html>

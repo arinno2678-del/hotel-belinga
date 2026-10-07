@@ -1,9 +1,10 @@
 # Hôtel Belinga — robots.txt
-# La vitrine publique est indexable, la gestion et l'API ne le sont pas.
+# La vitrine publique est indexable ; la gestion, l'API et la connexion ne le sont pas.
 User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /admin.html
+Disallow: /login
 Disallow: /api/
 
 # Sitemap de la page publique

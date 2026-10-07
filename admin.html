@@ -97,6 +97,11 @@
                     <i class="fa-solid fa-user"></i>
                 </button>
 
+                <button class="profile-btn" id="logoutButton" type="button"
+                        title="Se déconnecter" aria-label="Se déconnecter">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+
             </div>
 
         </header>
@@ -746,6 +751,33 @@
 
     </div>
 
+
+    <script>
+        // Séance : le serveur renvoie 401 quand la session est absente ou
+        // expirée (8 h) — on ramène immédiatement le personnel sur /login.
+        const rawFetch = window.fetch.bind(window);
+
+        window.fetch = async (...args) => {
+            const response = await rawFetch(...args);
+
+            if (response.status === 401) {
+                window.location.href = "/login";
+            }
+
+            return response;
+        };
+
+        // Bouton de déconnexion (enlève le cookie de session côté serveur).
+        document.getElementById("logoutButton").addEventListener("click", async () => {
+            try {
+                await rawFetch("/api/logout", { method: "POST" });
+            } catch {
+                // Ignoré : on quitte dans tous les cas.
+            }
+
+            window.location.href = "/login";
+        });
+    </script>
 
     <script src="script.js?v=20"></script>
 

@@ -2,6 +2,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createStorage, getAllowedPrices, ADVANCE_PAYMENT_KIND } from "./db.js";
 
@@ -13,6 +14,29 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT) || 3000;
 const publicDir = __dirname;
 const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]);
+
+
+// ===============================================================
+// AUTHENTIFICATION DU PERSONNEL
+// Le mot de passe vit UNIQUEMENT dans les variables d'environnement
+// (Render > Environment : ADMIN_PASSWORD, et ADMIN_USERNAME si besoin).
+// Rien n'est écrit dans le code ni dans le dépôt GitHub public.
+// ===============================================================
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "hoteladmin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // session de 8 heures
+
+// Jeton de session -> { user, expiresAt } (mémoire du processus :
+// un redémarrage Render déconnecte tous les personnels, c'est voulu).
+const sessions = new Map();
+
+if (!ADMIN_PASSWORD) {
+    console.warn(
+        "[AUTH] ADMIN_PASSWORD n'est pas defini : la connexion /login sera refusee. " +
+        "Ajoutez la variable ADMIN_PASSWORD dans Render > Environment."
+    );
+}
+
 
 
 function escapeCsv(value) {
@@ -149,9 +173,14 @@ function resolveStaticFile(requestPath) {
 
     // La racine "/" sert la VITRINE PUBLIQUE (index.html) destinée à Google.
     // L'application de gestion (tableau de bord) est sur /admin (non indexée).
-    const safePath = (requestPath === "/admin" || requestPath === "/admin/")
+    // /login est la page de connexion du personnel.
+    let safePath = (requestPath === "/admin" || requestPath === "/admin/")
         ? "/admin.html"
         : (requestPath === "/" ? "/index.html" : requestPath);
+
+    if (requestPath === "/login" || requestPath === "/login/") {
+        safePath = "/login.html";
+    }
 
     const resolvedPath = path.resolve(publicDir, `.${safePath}`);
     const relativePath = path.relative(publicDir, resolvedPath);
@@ -161,6 +190,94 @@ function resolveStaticFile(requestPath) {
     }
 
     return resolvedPath;
+
+}
+
+
+// -------------------------------------------------------------
+// Sessions : cookie HttpOnly « hb_session », jeton aléatoire de
+// 32 octets, durée 8 h. Aucun mot de passe ne transite jamais
+// dans l'URL ni dans le JavaScript du client.
+// -------------------------------------------------------------
+function parseCookies(req) {
+
+    const jar = {};
+    const header = req.headers.cookie || "";
+
+    for (const part of header.split(";")) {
+        const index = part.indexOf("=");
+
+        if (index === -1) continue;
+
+        jar[part.slice(0, index).trim()] = decodeURIComponent(part.slice(index + 1).trim());
+    }
+
+    return jar;
+
+}
+
+
+function isHttpsRequest(req) {
+
+    const proto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+
+    return proto === "https";
+
+}
+
+
+function buildSessionCookie(req, token, maxAgeSeconds) {
+
+    const parts = [
+        `hb_session=${token}`,
+        "Path=/",
+        "HttpOnly",
+        "SameSite=Lax",
+        `Max-Age=${maxAgeSeconds}`
+    ];
+
+    if (isHttpsRequest(req)) {
+        parts.push("Secure");
+    }
+
+    return parts.join("; ");
+
+}
+
+
+// Retourne le jeton de session valide, ou null (absent / expiré).
+function sessionTokenOf(req) {
+
+    const token = parseCookies(req).hb_session;
+
+    if (!token) return null;
+
+    const session = sessions.get(token);
+
+    if (!session) return null;
+
+    if (session.expiresAt <= Date.now()) {
+        sessions.delete(token);
+        return null;
+    }
+
+    return token;
+
+}
+
+
+// Comparaison en temps constant (protection contre les attaques par timing).
+function sameText(a, b) {
+
+    const bufA = Buffer.from(String(a), "utf8");
+    const bufB = Buffer.from(String(b), "utf8");
+
+    if (bufA.length !== bufB.length) {
+        crypto.timingSafeEqual(bufA, bufA);
+        return false;
+    }
+
+    return crypto.timingSafeEqual(bufA, bufB);
 
 }
 
@@ -666,6 +783,95 @@ const server = http.createServer(async (req, res) => {
             });
 
             return res.end();
+        }
+
+
+        // ==========================================================
+        // 1) AUTHENTIFICATION — connexion, déconnexion, API publique
+        // ==========================================================
+
+        // Connexion du personnel : POST /api/login { username, password }
+        if (req.method === "POST" && pathname === "/api/login") {
+
+            const body = await readJsonBody(req);
+            const username = String(body?.username || "").trim();
+            const password = String(body?.password || "");
+
+            const validUser = sameText(username, ADMIN_USERNAME);
+            const validPass = ADMIN_PASSWORD.length > 0 && sameText(password, ADMIN_PASSWORD);
+
+            if (!validUser || !validPass) {
+                // Décélération volontaire : ralentit la force brute.
+                await new Promise(resolve => setTimeout(resolve, 700));
+                return sendJson(res, 401, { error: "Utilisateur ou mot de passe incorrect." });
+            }
+
+            const token = crypto.randomBytes(32).toString("hex");
+            sessions.set(token, {
+                user: username,
+                expiresAt: Date.now() + SESSION_TTL_MS
+            });
+
+            console.log(`[AUTH] Connexion de « ${username} » à ${new Date().toISOString()}`);
+
+            res.setHeader("Set-Cookie", buildSessionCookie(req, token, Math.floor(SESSION_TTL_MS / 1000)));
+            return sendJson(res, 200, { ok: true, user: username, redirect: "/admin" });
+        }
+
+
+        // Déconnexion : POST /api/logout
+        if (req.method === "POST" && pathname === "/api/logout") {
+
+            const token = sessionTokenOf(req);
+
+            if (token) sessions.delete(token);
+
+            res.setHeader("Set-Cookie", buildSessionCookie(req, "", 0));
+            return sendJson(res, 200, { ok: true });
+        }
+
+
+        // API publique des DISPONIBILITÉS (vitrine) : uniquement
+        // numéro / type / prix / statut — JAMAIS le nom du client,
+        // les dates de séjour ni le paiement.
+        if (req.method === "GET" && pathname === "/api/public/rooms") {
+
+            const rooms = await db.getRooms();
+
+            return sendJson(res, 200, rooms.map(room => ({
+                number: room.number,
+                type: room.type,
+                price: room.price,
+                status: room.status
+            })));
+        }
+
+
+        // ==========================================================
+        // 2) PORTE D'AUTHENTIFICATION
+        //    - /admin exige une session (sinon -> /login)
+        //    - toute API de gestion exige une session (sinon -> 401)
+        // ==========================================================
+        if (pathname === "/admin" || pathname === "/admin/") {
+
+            if (!sessionTokenOf(req)) {
+                res.writeHead(302, { Location: "/login", "Cache-Control": "no-store" });
+                return res.end();
+            }
+        }
+
+
+        const PUBLIC_APIS = new Set([
+            "/api/health",        // diagnostic d'état (aucune donnée client)
+            "/api/login",         // connexion
+            "/api/logout",        // déconnexion
+            "/api/public/rooms"   // disponibilités publiques
+        ]);
+
+        if (pathname.startsWith("/api/") && !PUBLIC_APIS.has(pathname) && !sessionTokenOf(req)) {
+            return sendJson(res, 401, {
+                error: "Authentification requise. Connectez-vous sur /login."
+            });
         }
 
 

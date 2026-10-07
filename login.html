@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#172033">
+
+    <title>Connexion — Hôtel Belinga</title>
+    <meta name="robots" content="noindex, nofollow">
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏨</text></svg>">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: "Poppins", sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background:
+                linear-gradient(rgba(23,32,51,.92), rgba(23,32,51,.96)),
+                url("https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80") center/cover no-repeat;
+            color: #172033;
+        }
+
+        .card {
+            width: min(420px, 100%);
+            background: #fff;
+            border-radius: 20px;
+            padding: 36px 30px;
+            box-shadow: 0 24px 60px rgba(0,0,0,.35);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-weight: 700;
+            letter-spacing: .6px;
+            margin-bottom: 6px;
+        }
+
+        .brand i { color: #d4a017; font-size: 22px; }
+
+        .sub {
+            text-align: center;
+            color: #6b7280;
+            font-size: 13.5px;
+            margin-bottom: 26px;
+        }
+
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+
+        .field { margin-bottom: 16px; }
+
+        .input-wrap { position: relative; }
+
+        input {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1.5px solid #d7dbe2;
+            border-radius: 11px;
+            font-family: inherit;
+            font-size: 15px;
+            background: #f8f9fb;
+            outline: none;
+            transition: border-color .15s ease, background .15s ease;
+        }
+
+        input:focus { border-color: #0f766e; background: #fff; }
+
+        .toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-size: 15px;
+            cursor: pointer;
+            padding: 6px 8px;
+        }
+
+        button.submit {
+            width: 100%;
+            margin-top: 8px;
+            padding: 14px;
+            border: none;
+            border-radius: 11px;
+            background: #0f766e;
+            color: #fff;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            transition: background .15s ease;
+        }
+
+        button.submit:hover { background: #115e59; }
+        button.submit:disabled { opacity: .6; cursor: not-allowed; }
+
+        .message {
+            min-height: 20px;
+            margin-top: 14px;
+            font-size: 13.5px;
+            text-align: center;
+            color: #b91c1c;
+        }
+
+        .message.ok { color: #15803d; }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 18px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .back:hover { color: #0f766e; }
+    </style>
+</head>
+<body>
+    <main class="card">
+
+        <div class="brand"><i class="fa-solid fa-hotel"></i> HOTEL BELINGA</div>
+        <p class="sub">Espace personnel — accès réservé au staff de l'hôtel</p>
+
+        <form id="loginForm" novalidate>
+
+            <div class="field">
+                <label for="username">Utilisateur</label>
+                <div class="input-wrap">
+                    <input type="text" id="username" name="username"
+                           autocomplete="username" autocapitalize="none"
+                           placeholder="hoteladmin" required>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="password">Mot de passe</label>
+                <div class="input-wrap">
+                    <input type="password" id="password" name="password"
+                           autocomplete="current-password" placeholder="••••••••" required>
+                    <button class="toggle" id="togglePwd" type="button"
+                            title="Afficher / masquer le mot de passe" aria-label="Afficher le mot de passe">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button class="submit" id="submitBtn" type="submit">
+                <i class="fa-solid fa-right-to-bracket"></i> Se connecter
+            </button>
+
+            <p class="message" id="loginMessage" role="status"></p>
+        </form>
+
+        <a class="back" href="/"><i class="fa-solid fa-arrow-left"></i> Retour au site de l'hôtel</a>
+
+    </main>
+
+    <script>
+        const form = document.getElementById("loginForm");
+        const message = document.getElementById("loginMessage");
+        const submitBtn = document.getElementById("submitBtn");
+        const togglePwd = document.getElementById("togglePwd");
+        const passwordInput = document.getElementById("password");
+
+        togglePwd.addEventListener("click", () => {
+            const revealing = passwordInput.type === "password";
+            passwordInput.type = revealing ? "text" : "password";
+            togglePwd.innerHTML = revealing
+                ? '<i class="fa-solid fa-eye-slash"></i>'
+                : '<i class="fa-solid fa-eye"></i>';
+        });
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const username = document.getElementById("username").value.trim();
+            const password = passwordInput.value;
+
+            message.textContent = "";
+            message.classList.remove("ok");
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch("/api/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    message.textContent = data.error || "Connexion refusée.";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                message.textContent = "Connexion réussie — redirection…";
+                message.classList.add("ok");
+                window.location.href = data.redirect || "/admin";
+
+            } catch {
+                message.textContent = "Serveur injoignable. Réessayez dans un instant.";
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+
+</body>
+</html>
