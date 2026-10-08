@@ -56,21 +56,23 @@ Le site a deux parties :
 | `/admin` | **session requise** | Tableau de bord (Chambres, Planning, Clients, Réservations, Paiements, Statistiques, Historique) |
 | `/api/history`, `/api/payments`, `/api/rooms`, exports, reçus, écritures | **session requise** | Renvoient `401` sans connexion |
 
-### Paramétrage du mot de passe (obligatoire)
+### Paramétrage du mot de passe
 
-Le dépôt GitHub étant **public**, le mot de passe n'est écrit nulle part dans
-le code : il est lu dans la variable d'environnement `ADMIN_PASSWORD`.
+Le dépôt GitHub étant **public**, le mot de passe n'est écrit **nulle part en
+clair** : le serveur compare l'entrée à une **empreinte scrypt** (salée)
+intégrée à `server.js`.
 
-1. https://render.com → votre service **hotel-belinga** → onglet **Environment**
-2. Ajouter :
-   - Clé : `ADMIN_PASSWORD` — Valeur : **le mot de passe choisi** (ex. 12 caractères min.)
-   - Clé : `ADMIN_USERNAME` — Valeur : `hoteladmin` (optionnel, c'est la valeur par défaut)
+- **Utilisateur** : `hoteladmin` (variable `ADMIN_USERNAME`, valeur par défaut)
+- **Mot de passe** : `adminhotelbelinga27`
+- Variable optionnelle `ADMIN_PASSWORD` : si vous la définissez dans Render,
+  elle **remplace** l'empreinte intégrée (utile pour changer de mot de passe
+  sans toucher au code).
+
+Pour changer de mot de passe plus tard :
+
+1. https://render.com → service **hotel-belinga** → onglet **Environment**
+2. **Add Variable** : `ADMIN_PASSWORD` = le nouveau mot de passe
 3. **Save** (Render redéploie automatiquement)
-4. Ouvrir `https://hotel-belinga.onrender.com/login` et se connecter.
-
-Sans cette variable, **toute tentative de connexion est refusée** (c'est le
-comportement sûr) et Render affiche dans les logs :
-`[AUTH] ADMIN_PASSWORD n'est pas defini…`
 
 ### Comportement des sessions
 

@@ -23,16 +23,27 @@ const allowedStatuses = new Set(["Libre", "Occupée", "Réservée", "Nettoyage"]
 // Rien n'est écrit dans le code ni dans le dépôt GitHub public.
 // ===============================================================
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "hoteladmin";
+
+// Mot de passe du personnel :
+//  1) variable d'environnement ADMIN_PASSWORD (prioritaire, si définie) ;
+//  2) sinon l'empreinte scrypt ci-dessous.
+// Le dépôt GitHub est PUBLIC : seul le HACHAGE est stocké ici, jamais le
+// mot de passe en clair — personne ne peut le lire depuis le code.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const PASSWORD_SALT = "hotel-belinga-admin-v1";
+const PASSWORD_HASH_SCRYPT =
+    "a70c356aa5da3884444a04423ede6d8d8942bc6528daad21bd9e0311c40ad3f0" +
+    "253824b6e8b9f6241cb2bfd847d3731a41f8ab646e7098c13c89013b9f6d463e";
+
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000; // session de 8 heures
 
 // Jeton de session -> { user, expiresAt } (mémoire du processus :
 // un redémarrage Render déconnecte tous les personnels, c'est voulu).
 const sessions = new Map();
 
-if (!ADMIN_PASSWORD) {
+if (!ADMIN_PASSWORD && !PASSWORD_HASH_SCRYPT) {
     console.warn(
-        "[AUTH] ADMIN_PASSWORD n'est pas defini : la connexion /login sera refusee. " +
+        "[AUTH] Aucun mot de passe configure : la connexion /login sera refusee. " +
         "Ajoutez la variable ADMIN_PASSWORD dans Render > Environment."
     );
 }
@@ -278,6 +289,33 @@ function sameText(a, b) {
     }
 
     return crypto.timingSafeEqual(bufA, bufB);
+
+}
+
+
+// Empreinte scrypt du mot de passe : le clair n'existe nulle part dans le
+// code, et voler ce hachage ne permet pas de reconstituer le mot de passe.
+function scryptFingerprint(value) {
+    return crypto.scryptSync(String(value), PASSWORD_SALT, 64).toString("hex");
+}
+
+
+// Vérification du mot de passe soumis par le formulaire /login.
+function passwordIsValid(candidate) {
+
+    if (!candidate) return false;
+
+    // 1) Variable d'environnement ADMIN_PASSWORD (prioritaire si définie).
+    if (ADMIN_PASSWORD) {
+        return sameText(candidate, ADMIN_PASSWORD);
+    }
+
+    // 2) Empreinte intégrée au serveur.
+    if (PASSWORD_HASH_SCRYPT) {
+        return sameText(scryptFingerprint(candidate), PASSWORD_HASH_SCRYPT);
+    }
+
+    return false;
 
 }
 
@@ -798,7 +836,7 @@ const server = http.createServer(async (req, res) => {
             const password = String(body?.password || "");
 
             const validUser = sameText(username, ADMIN_USERNAME);
-            const validPass = ADMIN_PASSWORD.length > 0 && sameText(password, ADMIN_PASSWORD);
+            const validPass = passwordIsValid(password);
 
             if (!validUser || !validPass) {
                 // Décélération volontaire : ralentit la force brute.
